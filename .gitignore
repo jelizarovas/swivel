@@ -1,0 +1,13 @@
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+.vs/
+TestResults/
+.env
+.env.*
+*.pfx
+*.snk
+*.cer
+*.key
