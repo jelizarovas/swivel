@@ -25,20 +25,22 @@ public enum PortraitTurn
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public int DismissDelayMilliseconds { get; set; } = 2000;
     public BubbleAnchor LandscapeAnchor { get; set; } = BubbleAnchor.MiddleRight;
     public BubbleAnchor PortraitAnchor { get; set; } = BubbleAnchor.BottomCenter;
     public PortraitTurn PortraitTurn { get; set; } = PortraitTurn.Clockwise;
+    public int DisplayIndex { get; set; }
     public bool ShowSettingsButton { get; set; }
     public bool LaunchAtSignIn { get; set; }
     public double EdgeMarginDips { get; set; } = 32;
 
     public AppSettings Normalize()
     {
-        SchemaVersion = 1;
+        SchemaVersion = 2;
         DismissDelayMilliseconds = Math.Clamp(DismissDelayMilliseconds, 500, 10000);
         EdgeMarginDips = Math.Clamp(EdgeMarginDips, 8, 160);
+        DisplayIndex = Math.Max(0, DisplayIndex);
 
         if (!Enum.IsDefined(LandscapeAnchor))
         {
@@ -65,6 +67,7 @@ public sealed class AppSettings
         LandscapeAnchor = LandscapeAnchor,
         PortraitAnchor = PortraitAnchor,
         PortraitTurn = PortraitTurn,
+        DisplayIndex = DisplayIndex,
         ShowSettingsButton = ShowSettingsButton,
         LaunchAtSignIn = LaunchAtSignIn,
         EdgeMarginDips = EdgeMarginDips

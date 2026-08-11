@@ -1,20 +1,15 @@
-# Swivel v0.1.4
+# Swivel v0.1.5
 
-The bubble-and-icon polish release.
+The quieter demo and multi-monitor release.
 
 ## Changed
 
-- Embedded the Swivel icon directly for the EXE, WPF window, and notification-area icon instead of relying on single-file icon extraction.
-- Replaced the large rectangular rotation card with the real compact round Swivel button and circular dismissal progress.
-- Holding the blue Swivel button for two seconds reveals a separate Settings shortcut; fingerprint hold duration remains unavailable to Windows apps.
-- Added an interactive website demo with Stand, Wall mounted, and Monitor modes, guided handoff, tray triggering, 85% drag-to-commit, snap-back, reverse rotation, and inactivity replay.
-- Corrected the 3D Hub pitch axis, added silver chassis edges, and modeled the Steelcase stand plate, wall plate, and monitor stand.
-- Rewrote the single-screen page copy and added an optional PayPal donation button.
+- Added Monitor chips when more than one display is connected. Rotation and bubble placement now follow the selected display.
+- Made one left-click on the tray icon rotate the selected display. Right-click still opens the tray menu.
+- Tightened the website fingerprint-reader hit target so it follows the visible reader instead of the whole screen edge.
+- Made the guided animation interruptible from the first click and removed the rapidly changing instruction captions.
+- Changed physical dragging to use directional pointer distance, so southwest movement counts naturally.
+- Simplified Monitor mode to one tray-icon click per rotation with no secondary on-screen button.
+- Simplified the landing-page copy, added the GitHub repository link, and changed Compatibility, How it runs, Privacy, and Terms to underlined modal links.
 
-## Carried forward from v0.1.2
-
-- **Right side down** maps to Windows portrait 90; **Left side down** maps to portrait 270.
-- Settings save automatically and use touch-friendly Material-style chips.
-- Native vertical touch panning, a rounded scrollbar, compact cards, and collapsed diagnostics.
-
-Both executables remain unsigned. The corrected right-side-down mapping and real reader behavior still need confirmation on the Surface Hub 2S.
+Both executables remain unsigned. Real fingerprint-reader support and corrected rotation direction still need confirmation on the Surface Hub 2S.

@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f1e8">
   <meta name="description" content="The tiny free Windows button for screens that physically rotate.">
-  <meta property="og:title" content="Swivel — one tap, ninety degrees, zero menus.">
+  <meta property="og:title" content="Swivel: one tap, ninety degrees, zero menus.">
   <meta property="og:description" content="Windows made screen rotation a journey. Swivel makes it a button.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://jelizarovas.github.io/swivel/">
   <meta property="og:image" content="https://jelizarovas.github.io/swivel/assets/animation/frame-touch.webp">
-  <title>Swivel — one tap, ninety degrees, zero menus.</title>
+  <title>Swivel: one tap, ninety degrees, zero menus.</title>
   <link rel="icon" href="assets/swivel-mark.svg?v=3" type="image/svg+xml">
   <link rel="preload" href="assets/animation/frame-landscape.webp" as="image" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <main class="page-shell">
@@ -22,34 +22,41 @@
         <img src="assets/swivel-mark.svg?v=3" width="38" height="38" alt="">
         <span>Swivel</span>
       </div>
-      <a class="donate-link"
-         href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=arnas.jelizarovas%40gmail.com&amp;item_name=Swivel+development&amp;currency_code=USD"
-         target="_blank"
-         rel="noopener">Keep Swivel free · Donate</a>
+      <nav class="topbar-links" aria-label="Project links">
+        <a class="github-link" href="https://github.com/jelizarovas/swivel" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.24c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.78 1.2 1.78 1.2 1.04 1.77 2.72 1.26 3.39.96.1-.75.4-1.26.74-1.55-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.16 1.18A10.98 10.98 0 0 1 12 6.11c.98 0 1.94.13 2.86.39 2.19-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.07.79 2.16v3.26c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>
+          <span>jelizarovas/swivel</span>
+        </a>
+        <a class="donate-link"
+           href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=arnas.jelizarovas%40gmail.com&amp;item_name=Swivel+development&amp;currency_code=USD"
+           target="_blank"
+           rel="noopener">Donate</a>
+      </nav>
     </header>
 
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span></span>The app hiding inside a 50-inch problem</p>
         <h1 id="hero-title">One tap.<br>Ninety degrees.<br><em>Zero menus.</em></h1>
-        <p class="lede">Microsoft gave the Surface Hub a rotating stand. Then Windows hid rotation in Settings. So I built the missing button. It’s free, tiny, and does exactly one thing—an increasingly suspicious concept in software.</p>
+        <p class="lede">The Surface Hub rotates. Windows makes you hunt through Settings. Swivel turns the whole job into one tap. It is free, tiny, and does exactly one thing. An increasingly suspicious concept in software.</p>
 
         <div class="downloads" aria-label="Download choices">
           <a class="download download-primary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">
             <span>Download Swivel</span>
-            <small>337 KB</small>
+            <small>317 KB</small>
           </a>
           <a class="download download-secondary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel-standalone.exe">
             <span>Standalone</span>
             <small>68 MiB</small>
           </a>
         </div>
-        <p class="release-meta">Latest: <strong>v0.1.4</strong> · released Aug 11, 2026</p>
+        <p class="release-meta">Latest: <strong>v0.1.5</strong> · released Aug 11, 2026</p>
 
-        <p class="runtime-note"><strong>Start with 337 KB.</strong> If Windows complains about .NET 8, install it—or grab the 68 MiB version that packed its own.</p>
+        <p class="runtime-note">Try the regular download first. If Windows asks for .NET 8, install it or use Standalone.</p>
         <div class="info-actions" aria-label="More information">
           <button type="button" data-open-modal="compatibility">Compatibility</button>
           <button type="button" data-open-modal="background">How it runs</button>
+          <button type="button" data-open-modal="privacy">Privacy</button>
+          <button type="button" data-open-modal="terms">Terms</button>
         </div>
       </div>
 
@@ -63,10 +70,6 @@
         <canvas id="swivel-scene" aria-hidden="true"></canvas>
         <div class="scene-shine" aria-hidden="true"></div>
         <img class="demo-cursor" src="assets/3d/pointer-hand.png" alt="" aria-hidden="true">
-        <figcaption>
-          <span class="loop-dot"></span>
-          <span id="scene-caption">Watch once. Then the screen is yours.</span>
-        </figcaption>
       </figure>
     </section>
   </main>
@@ -75,7 +78,7 @@
     <section role="dialog" aria-modal="true" aria-labelledby="compatibility-title">
       <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
       <p class="modal-kicker">Before the first swivel</p>
-      <h2 id="compatibility-title">One boring—but important—paragraph.</h2>
+      <h2 id="compatibility-title">One boring but important paragraph.</h2>
       <p>Swivel needs Windows 10/11 Pro or Enterprise. Windows 10 Team cannot use the fingerprint reader. The app is unsigned, so Windows may ask whether you’re sure. You are still in charge of that decision.</p>
     </section>
   </div>
@@ -85,10 +88,28 @@
       <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
       <p class="modal-kicker">Quietly useful</p>
       <h2 id="background-title">It lives in the tray.</h2>
-      <p>Close Settings and Swivel slips into the notification area, where tiny useful apps belong. Hold the blue Swivel button for two seconds whenever you need Settings. It listens only while you’re signed in. No service. No account. No telemetry.</p>
+      <p>Close Settings and Swivel slips into the notification area, where tiny useful apps belong. On a regular monitor, one left-click on the tray icon rotates the selected display. On a Surface Hub, hold the blue button for two seconds whenever you need Settings. No service. No account. No telemetry.</p>
     </section>
   </div>
-  <script src="page.js?v=4"></script>
-  <script type="module" src="swivel-scene.js?v=5"></script>
+
+  <div class="info-modal" data-modal="privacy" hidden>
+    <section role="dialog" aria-modal="true" aria-labelledby="privacy-title">
+      <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
+      <p class="modal-kicker">Privacy</p>
+      <h2 id="privacy-title">Your screen stays your business.</h2>
+      <p>Swivel has no accounts, analytics, advertising, or telemetry. App settings and diagnostics stay on your PC. GitHub and PayPal handle their own data when you use their links.</p>
+    </section>
+  </div>
+
+  <div class="info-modal" data-modal="terms" hidden>
+    <section role="dialog" aria-modal="true" aria-labelledby="terms-title">
+      <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
+      <p class="modal-kicker">Terms</p>
+      <h2 id="terms-title">Free software. Use your judgment.</h2>
+      <p>Swivel is provided as is, without warranties. You are responsible for testing display changes on your device. Swivel is not affiliated with or endorsed by Microsoft or Steelcase.</p>
+    </section>
+  </div>
+  <script src="page.js?v=5"></script>
+  <script type="module" src="swivel-scene.js?v=6"></script>
 </body>
 </html>

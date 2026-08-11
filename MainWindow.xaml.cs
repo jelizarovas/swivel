@@ -52,6 +52,14 @@ public partial class MainWindow : Window
             new Choice<PortraitTurn>("Left side down", PortraitTurn.CounterClockwise)
         };
 
+        var displays = _host.GetDisplayTargets();
+        DisplayTargetChips.ItemsSource = displays
+            .Select(display => new Choice<int>(display.Label, display.Index))
+            .ToArray();
+        DisplayTargetCard.Visibility = displays.Count > 1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         LoadSettings(_host.Settings);
         _isLoadingSettings = false;
         LoadDiagnostics();
@@ -84,6 +92,9 @@ public partial class MainWindow : Window
         LandscapePositionChips.SelectedValue = settings.LandscapeAnchor;
         PortraitPositionChips.SelectedValue = settings.PortraitAnchor;
         PortraitTurnChips.SelectedValue = settings.PortraitTurn;
+        DisplayTargetChips.SelectedValue = DisplayRotationService.ResolveDisplayIndex(
+            settings.DisplayIndex,
+            Math.Max(1, DisplayTargetChips.Items.Count));
         LaunchAtSignInCheckBox.IsChecked = settings.LaunchAtSignIn;
         UpdateDelayText();
     }
@@ -101,6 +112,9 @@ public partial class MainWindow : Window
         PortraitTurn = PortraitTurnChips.SelectedValue is PortraitTurn turn
             ? turn
             : PortraitTurn.Clockwise,
+        DisplayIndex = DisplayTargetChips.SelectedValue is int displayIndex
+            ? displayIndex
+            : 0,
         LaunchAtSignIn = LaunchAtSignInCheckBox.IsChecked == true,
         EdgeMarginDips = _host.Settings.EdgeMarginDips
     };
@@ -205,6 +219,14 @@ public partial class MainWindow : Window
     }
 
     private void SettingsSelection_Changed(object sender, SelectionChangedEventArgs e) => QueueSave();
+
+    private void DisplayTarget_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        QueueSave();
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.ApplicationIdle,
+            new Action(RefreshDisplayStatus));
+    }
 
     private void SettingsToggle_Click(object sender, RoutedEventArgs e) => QueueSave();
 

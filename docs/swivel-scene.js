@@ -2,7 +2,6 @@ import * as THREE from "./vendor/three.module.min.js";
 
 const canvas = document.querySelector("#swivel-scene");
 const demo = document.querySelector(".demo");
-const caption = document.querySelector("#scene-caption");
 const modeButtons = [...document.querySelectorAll("[data-demo-mode]")];
 const cursorElement = document.querySelector(".demo-cursor");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -399,7 +398,6 @@ try {
   reader.position.set(2.96, 0, 0.02);
   const readerBody = new THREE.Mesh(roundedSolid(0.28, 0.7, 0.12, 0.25, 0.025), silver);
   readerBody.castShadow = true;
-  readerBody.userData.action = "trigger";
   reader.add(readerBody);
   const readerInset = new THREE.Mesh(
     new THREE.CircleGeometry(0.095, 24),
@@ -408,6 +406,12 @@ try {
   readerInset.scale.y = 1.65;
   readerInset.position.z = 0.15;
   reader.add(readerInset);
+  const readerHit = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.34, 0.76),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
+  readerHit.position.z = 0.18;
+  readerHit.userData.action = "trigger";
+  reader.add(readerHit);
   display.add(reader);
 
   const loader = new THREE.TextureLoader();
@@ -515,7 +519,6 @@ try {
     if (name === currentPhase) return;
     currentPhase = name;
     demo.dataset.phase = name;
-    if (caption) caption.innerHTML = text;
   }
 
   function getWorldPosition(local) {
@@ -571,6 +574,7 @@ try {
   let pressedAt = 0;
   let bubbleHoldTriggered = false;
   let dragState = null;
+  let guidedContentProgress = 0;
 
   function applyMode(mode) {
     currentMode = mode;
@@ -622,23 +626,30 @@ try {
     setPhase("guided", message);
   }
 
-  function enterInteractive() {
+  function enterInteractive(preserveGuideState = false) {
     guided = false;
-    physicalProgress = 0;
-    physicalTarget = 0;
-    contentProgress = 0;
-    contentTarget = 0;
+    if (preserveGuideState) {
+      physicalProgress = clamp(-display.rotation.z / (Math.PI / 2));
+      contentProgress = guidedContentProgress;
+      physicalTarget = physicalProgress;
+      contentTarget = contentProgress;
+    } else {
+      physicalProgress = 0;
+      physicalTarget = 0;
+      contentProgress = 0;
+      contentTarget = 0;
+    }
     bubbleVisible = false;
     settingsVisibleUntil = 0;
     pointer.visible = false;
     grip.visible = false;
     lastActivityAt = performance.now();
     demo.classList.add("is-interactive");
-    setPhase(
-      "interactive",
-      currentMode === "monitor"
-        ? "Now you try it — click Swivel in the tray."
-        : "Now you try it — touch the fingerprint reader.");
+    setPhase("interactive", "interactive");
+  }
+
+  function interruptGuide() {
+    if (guided) enterInteractive(true);
   }
 
   function noteActivity() {
@@ -651,44 +662,27 @@ try {
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(rayPosition, camera);
-    const hits = raycaster.intersectObjects([bubble, readerBody, trayHit, rightEdgeHit], false);
+    const hits = raycaster.intersectObjects([bubble, readerHit, trayHit, rightEdgeHit], false);
     for (const hit of hits) {
       const action = hit.object.userData.action;
       if (action === "bubble" && bubbleVisible) return action;
       if (action === "trigger") {
         if (currentMode === "monitor" && hit.object === trayHit) return action;
-        if (currentMode !== "monitor" && hit.object === readerBody) return action;
+        if (currentMode !== "monitor" && hit.object === readerHit) return action;
       }
-      if (action === "edge" && Math.abs(contentTarget - physicalProgress) > 0.02) return action;
+      if (action === "edge"
+          && currentMode !== "monitor"
+          && Math.abs(contentTarget - physicalProgress) > 0.02) return action;
     }
     return null;
   }
 
   function updateInteractiveCaption() {
-    if (dragState) {
-      const distance = Math.round(Math.abs(physicalProgress - dragState.startProgress) * 100);
-      setPhase("dragging", `Keep going… <b>${distance}%</b> of 85%`);
-    } else if (Math.abs(contentTarget - physicalProgress) > 0.025) {
-      setPhase(
-        "ready-to-swivel",
-        contentTarget > physicalProgress
-          ? "Drag the right edge down. 85% commits."
-          : "Drag the lower edge back up. 85% commits.");
-    } else if (bubbleVisible) {
-      setPhase("bubble-live", "Tap Swivel—or hold it 2 seconds for Settings.");
-    } else if (physicalProgress > 0.98) {
-      setPhase(
-        "portrait-ready",
-        currentMode === "monitor"
-          ? "Portrait. Click the tray icon to go back."
-          : "Portrait. Touch the reader to go back.");
-    } else {
-      setPhase(
-        "interactive",
-        currentMode === "monitor"
-          ? "Now you try it — click Swivel in the tray."
-          : "Now you try it — touch the fingerprint reader.");
-    }
+    if (dragState) setPhase("dragging", "dragging");
+    else if (Math.abs(contentTarget - physicalProgress) > 0.025) setPhase("ready-to-swivel", "ready");
+    else if (bubbleVisible) setPhase("bubble-live", "bubble");
+    else if (physicalProgress > 0.98) setPhase("portrait-ready", "portrait");
+    else setPhase("interactive", "interactive");
   }
 
   function showBubble(now) {
@@ -722,8 +716,15 @@ try {
 
     if (dragState) {
       const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
+      const dx = event.clientX - dragState.startX;
+      const dy = event.clientY - dragState.startY;
+      const forward = dragState.destination > dragState.startProgress;
+      const directionX = forward ? -0.45 : 0.45;
+      const directionY = forward ? 0.89 : -0.89;
+      const projectedDistance = Math.max(0, dx * directionX + dy * directionY);
+      const travel = clamp(projectedDistance / dragDistance);
       physicalProgress = clamp(
-        dragState.startProgress + (event.clientY - dragState.startY) / dragDistance);
+        mix(dragState.startProgress, dragState.destination, travel));
       physicalTarget = physicalProgress;
       updateInteractiveCaption();
       return;
@@ -737,7 +738,7 @@ try {
     }
   });
   canvas.addEventListener("pointerdown", (event) => {
-    if (guided) return;
+    interruptGuide();
     noteActivity();
     const action = findAction(event);
     pressedAction = action;
@@ -745,6 +746,7 @@ try {
     bubbleHoldTriggered = false;
     if (action === "edge") {
       dragState = {
+        startX: event.clientX,
         startY: event.clientY,
         startProgress: physicalProgress,
         destination: contentTarget
@@ -758,7 +760,7 @@ try {
     }
   });
   canvas.addEventListener("pointerup", (event) => {
-    if (guided) return;
+    interruptGuide();
     noteActivity();
     const now = performance.now();
     if (dragState) {
@@ -771,7 +773,14 @@ try {
       demo.classList.remove("is-dragging");
       updateInteractiveCaption();
     } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
-      bubbleVisible ? (bubbleVisible = false) : showBubble(now);
+      if (currentMode === "monitor") {
+        const next = contentTarget > 0.5 ? 0 : 1;
+        contentTarget = next;
+        physicalTarget = next;
+        bubbleVisible = false;
+      } else {
+        bubbleVisible ? (bubbleVisible = false) : showBubble(now);
+      }
       updateInteractiveCaption();
     } else if (pressedAction === "bubble" && findAction(event) === "bubble") {
       if (bubbleHoldTriggered) {
@@ -867,7 +876,45 @@ try {
     let gripOpacity = 0;
     let gripCorner = new THREE.Vector3(2.82, 1.63, 0.2);
 
-    if (t < 1.15) {
+    if (currentMode === "monitor") {
+      bubbleOpacity = 0;
+      if (t < 1.25) {
+        setPhase("monitor-landscape", "monitor landscape");
+      } else if (t < 2.1) {
+        setPhase("monitor-click", "tray click");
+        pointerPress = segment(t, 1.62, 1.88) * (1 - segment(t, 1.88, 2.08));
+      } else if (t < 4.25) {
+        setPhase("monitor-turn", "monitor turns");
+        const turn = segment(t, 2.1, 3.85);
+        contentAngle = mix(0, Math.PI / 2, turn);
+        panelAngle = mix(0, -Math.PI / 2, turn);
+        pointerPortraitAmount = turn;
+        pointerOpacity = 1 - segment(t, 2.1, 2.55);
+      } else if (t < 5.45) {
+        setPhase("monitor-portrait", "monitor portrait");
+        contentAngle = Math.PI / 2;
+        panelAngle = -Math.PI / 2;
+        pointerPortraitAmount = 1;
+        pointerOpacity = segment(t, 4.25, 4.75);
+      } else if (t < 6.3) {
+        setPhase("monitor-click-return", "tray click");
+        contentAngle = Math.PI / 2;
+        panelAngle = -Math.PI / 2;
+        pointerPortraitAmount = 1;
+        pointerPress = segment(t, 5.72, 5.98) * (1 - segment(t, 5.98, 6.25));
+      } else if (t < 8.35) {
+        setPhase("monitor-return", "monitor returns");
+        const turn = segment(t, 6.3, 8.0);
+        contentAngle = mix(Math.PI / 2, 0, turn);
+        panelAngle = mix(-Math.PI / 2, 0, turn);
+        pointerPortraitAmount = 1 - turn;
+        pointerOpacity = 1 - segment(t, 6.3, 6.75);
+      } else if (frozenTime === null) {
+        enterInteractive();
+        requestAnimationFrame(animate);
+        return;
+      }
+    } else if (t < 1.15) {
       setPhase("landscape", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the fingerprint reader");
     } else if (t < 2.2) {
       setPhase("touch-reader", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the edge reader");
@@ -965,6 +1012,7 @@ try {
       setPhase("done", "Now you try it.");
     }
 
+    guidedContentProgress = clamp(contentAngle / (Math.PI / 2));
     display.rotation.z = panelAngle;
     ui.draw(contentAngle, currentMode);
     bubbleGroup.rotation.z = -panelAngle;

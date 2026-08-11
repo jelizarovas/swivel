@@ -105,7 +105,8 @@ public partial class App : System.Windows.Application
         _fingerprintMonitor.StatusChanged += OnFingerprintStatusChanged;
         _fingerprintMonitor.DiagnosticWarning += OnFingerprintDiagnosticWarning;
 
-        _logger.Info("Swivel 0.1.4 started.");
+        var appVersion = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+        _logger.Info($"Swivel {appVersion} started.");
         _logger.Info($"Settings: {_settingsStore.SettingsPath}");
         _logger.Info($"Diagnostics: {_logger.LogPath}");
 
@@ -180,7 +181,7 @@ public partial class App : System.Windows.Application
         _logger?.Snapshot() ?? Array.Empty<string>();
 
     internal DisplayState GetDisplayState() =>
-        _displayRotation?.GetCurrentState()
+        _displayRotation?.GetCurrentState(Settings.DisplayIndex)
         ?? new DisplayState(
             false,
             true,
@@ -188,6 +189,12 @@ public partial class App : System.Windows.Application
             0,
             0,
             "Display service has not started.");
+
+    internal IReadOnlyList<DisplayTarget> GetDisplayTargets() =>
+        _displayRotation?.GetDisplays() ?? Array.Empty<DisplayTarget>();
+
+    internal DisplayTarget? GetSelectedDisplayTarget() =>
+        _displayRotation?.GetDisplay(Settings.DisplayIndex);
 
     internal RotationResult RotateDisplay()
     {
@@ -199,7 +206,7 @@ public partial class App : System.Windows.Application
                 DisplayChangeResult.Failed);
         }
 
-        var result = _displayRotation.Toggle(Settings.PortraitTurn);
+        var result = _displayRotation.Toggle(Settings.PortraitTurn, Settings.DisplayIndex);
         if (result.Success)
         {
             _logger?.Info(result.Message);
@@ -249,6 +256,7 @@ public partial class App : System.Windows.Application
 
             Settings = settings.Copy();
             _overlay?.ApplySettings();
+            _controlPanel?.RefreshDisplayStatus();
             _logger?.Info("Settings saved.");
             message = settings.LaunchAtSignIn
                 ? "Saved. Swivel will launch after sign-in."
@@ -429,6 +437,9 @@ public partial class App : System.Windows.Application
     private void CreateTrayIcon()
     {
         _trayMenu = new Forms.ContextMenuStrip();
+        _trayMenu.Items.Add("Rotate display", null, (_, _) =>
+            Dispatcher.BeginInvoke(new Action(RotateFromTray)));
+        _trayMenu.Items.Add(new Forms.ToolStripSeparator());
         _trayMenu.Items.Add("Open Swivel", null, (_, _) =>
             Dispatcher.BeginInvoke(new Action(ShowControlPanel)));
         _trayMenu.Items.Add("Simulate fingerprint touch", null, (_, _) =>
@@ -460,8 +471,26 @@ public partial class App : System.Windows.Application
             ContextMenuStrip = _trayMenu,
             Visible = true
         };
-        _trayIcon.DoubleClick += (_, _) =>
-            Dispatcher.BeginInvoke(new Action(ShowControlPanel));
+        _trayIcon.MouseClick += (_, eventArgs) =>
+        {
+            if (eventArgs.Button == Forms.MouseButtons.Left)
+            {
+                Dispatcher.BeginInvoke(new Action(RotateFromTray));
+            }
+        };
+    }
+
+    private void RotateFromTray()
+    {
+        var result = RotateDisplay();
+        if (!result.Success && _trayIcon is not null)
+        {
+            _trayIcon.ShowBalloonTip(
+                3500,
+                "Swivel could not rotate the display",
+                result.Message,
+                Forms.ToolTipIcon.Warning);
+        }
     }
 
     private void SubscribeToSystemEvents()

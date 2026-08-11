@@ -74,10 +74,36 @@ body::before {
 }
 
 .donate-link,
-.eyebrow,
-.runtime-note,
-.demo figcaption {
+.github-link,
+.runtime-note {
   color: var(--soft-ink);
+}
+
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.github-link svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.github-link:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .donate-link {
@@ -100,19 +126,10 @@ body::before {
   background: rgba(255, 255, 255, 0.82);
 }
 
-.donate-link:focus-visible {
+.donate-link:focus-visible,
+.github-link:focus-visible {
   outline: 3px solid rgba(95, 116, 237, 0.3);
   outline-offset: 2px;
-}
-
-.eyebrow span,
-.loop-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--orange);
-  box-shadow: 0 0 0 4px rgba(216, 117, 56, 0.12);
 }
 
 .hero {
@@ -128,17 +145,6 @@ body::before {
   z-index: 2;
   min-width: 0;
   max-width: 610px;
-}
-
-.eyebrow {
-  margin: 0 0 clamp(12px, 2vh, 22px);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: clamp(0.7rem, 0.8vw, 0.82rem);
-  font-weight: 780;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 h1 {
@@ -246,26 +252,26 @@ h1 em {
 
 .info-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 7px 15px;
   margin-top: 9px;
 }
 
 .info-actions button {
-  padding: 6px 10px;
+  padding: 1px 0;
   color: #66636d;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.48);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
   font: inherit;
   font-size: clamp(0.65rem, 0.74vw, 0.73rem);
-  font-weight: 720;
+  font-weight: 650;
   cursor: pointer;
-  transition: transform 150ms ease, background 150ms ease;
+  transition: color 150ms ease;
 }
 
 .info-actions button:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.78);
+  color: var(--blue-deep);
 }
 
 .info-actions button:focus-visible,
@@ -400,36 +406,6 @@ h1 em {
   mix-blend-mode: soft-light;
 }
 
-.demo figcaption {
-  position: absolute;
-  z-index: 6;
-  left: 50%;
-  bottom: 22px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 13px;
-  border: 1px solid rgba(23, 24, 33, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 253, 249, 0.88);
-  box-shadow: 0 8px 24px rgba(48, 41, 55, 0.1);
-  backdrop-filter: blur(12px);
-  font-size: clamp(0.68rem, 0.85vw, 0.82rem);
-  font-weight: 720;
-  white-space: nowrap;
-  transform: translateX(-50%);
-}
-
-.demo figcaption b {
-  color: var(--blue);
-}
-
-.loop-dot {
-  background: var(--blue);
-  box-shadow: 0 0 0 4px rgba(95, 116, 237, 0.13);
-  animation: loop-pulse 1.6s ease-in-out infinite;
-}
-
 .info-modal {
   position: fixed;
   inset: 0;
@@ -497,10 +473,6 @@ h1 em {
   to { opacity: 1; }
 }
 
-@keyframes loop-pulse {
-  50% { transform: scale(0.72); opacity: 0.65; }
-}
-
 @media (max-width: 860px) {
   .page-shell {
     padding: 16px 18px 18px;
@@ -520,11 +492,6 @@ h1 em {
 
   .hero-copy {
     max-width: none;
-  }
-
-  .eyebrow {
-    margin-bottom: 10px;
-    font-size: 0.63rem;
   }
 
   h1 {
@@ -562,13 +529,6 @@ h1 em {
     border-radius: 24px;
   }
 
-  .demo figcaption {
-    left: 50%;
-    bottom: 11px;
-    padding: 7px 10px;
-    font-size: 0.62rem;
-  }
-
   .demo-tabs {
     top: 10px;
   }
@@ -598,12 +558,22 @@ h1 em {
   }
 
   .donate-link {
-    max-width: 146px;
     padding-inline: 10px;
     font-size: 0.62rem;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  .topbar-links {
+    gap: 9px;
+  }
+
+  .github-link {
+    font-size: 0;
+  }
+
+  .github-link svg {
+    width: 21px;
+    height: 21px;
   }
 
   .downloads {

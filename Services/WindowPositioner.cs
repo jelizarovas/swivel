@@ -14,11 +14,21 @@ internal static class WindowPositioner
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpShowWindow = 0x0040;
 
-    internal static void Position(Window window, BubbleAnchor anchor, double marginDips)
+    internal static void Position(
+        Window window,
+        BubbleAnchor anchor,
+        double marginDips,
+        DisplayTarget? displayTarget = null)
     {
         window.UpdateLayout();
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
-        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        var monitor = displayTarget is null
+            ? MonitorFromWindow(hwnd, MonitorDefaultToNearest)
+            : MonitorFromPoint(
+                new NativePoint(
+                    displayTarget.X + checked((int)displayTarget.Width / 2),
+                    displayTarget.Y + checked((int)displayTarget.Height / 2)),
+                MonitorDefaultToNearest);
         var monitorInfo = new MonitorInfo
         {
             Size = (uint)Marshal.SizeOf<MonitorInfo>()
@@ -115,6 +125,9 @@ internal static class WindowPositioner
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromPoint(NativePoint point, uint flags);
 
     [DllImport(
         "user32.dll",

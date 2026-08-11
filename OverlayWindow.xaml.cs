@@ -118,7 +118,11 @@ public partial class OverlayWindow : Window
             var anchor = display.IsLandscape
                 ? _host.Settings.LandscapeAnchor
                 : _host.Settings.PortraitAnchor;
-            WindowPositioner.Position(this, anchor, _host.Settings.EdgeMarginDips);
+            WindowPositioner.Position(
+                this,
+                anchor,
+                _host.Settings.EdgeMarginDips,
+                _host.GetSelectedDisplayTarget());
             RefreshTargetText();
         }
         catch (Exception exception)

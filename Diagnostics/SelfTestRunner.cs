@@ -61,6 +61,7 @@ internal static class SelfTestRunner
                 LandscapeAnchor = BubbleAnchor.MiddleRight,
                 PortraitAnchor = BubbleAnchor.BottomCenter,
                 PortraitTurn = PortraitTurn.CounterClockwise,
+                DisplayIndex = 1,
                 ShowSettingsButton = false
             };
             store.Save(expected);
@@ -70,8 +71,17 @@ internal static class SelfTestRunner
                 && actual.LandscapeAnchor == BubbleAnchor.MiddleRight
                 && actual.PortraitAnchor == BubbleAnchor.BottomCenter
                 && actual.PortraitTurn == PortraitTurn.CounterClockwise
+                && actual.DisplayIndex == 1
                 && !actual.ShowSettingsButton,
                 "Settings JSON round-trip",
+                lines,
+                ref failed);
+
+            Check(
+                DisplayRotationService.ResolveDisplayIndex(8, 2) == 1
+                && DisplayRotationService.ResolveDisplayIndex(-2, 2) == 0
+                && DisplayRotationService.ResolveDisplayIndex(0, 0) == 0,
+                "Display selection safely falls back to an available monitor",
                 lines,
                 ref failed);
 
@@ -113,7 +123,7 @@ internal static class SelfTestRunner
                 lines,
                 ref failed);
 
-            var displayState = new DisplayRotationService().GetCurrentState();
+            var displayState = new DisplayRotationService().GetCurrentState(actual.DisplayIndex);
             lines.Add($"INFO: Current display probe: {displayState.Message}");
         }
         catch (Exception exception)

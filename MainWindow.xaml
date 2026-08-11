@@ -201,6 +201,22 @@
                     </Grid>
                 </Border>
 
+                <Border x:Name="DisplayTargetCard"
+                        Style="{StaticResource CardStyle}"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Display" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Choose the screen Swivel rotates."
+                                   Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="12"
+                                   Margin="0,4,0,12" />
+                        <ListBox x:Name="DisplayTargetChips"
+                                 Style="{StaticResource ChoiceChipListStyle}"
+                                 SelectedValuePath="Value"
+                                 SelectionChanged="DisplayTarget_Changed" />
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <Grid>

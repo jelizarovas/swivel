@@ -32,6 +32,16 @@ internal sealed record DisplayState(
     uint Height,
     string Message);
 
+internal sealed record DisplayTarget(
+    int Index,
+    string DeviceName,
+    string Label,
+    bool IsPrimary,
+    int X,
+    int Y,
+    uint Width,
+    uint Height);
+
 internal sealed record RotationResult(
     bool Success,
     string Message,
@@ -45,14 +55,81 @@ internal sealed class DisplayRotationService
     private const uint DmPelsHeight = 0x00100000;
     private const uint CdsUpdateRegistry = 0x00000001;
     private const uint CdsTest = 0x00000002;
+    private const uint DisplayDeviceAttachedToDesktop = 0x00000001;
+    private const uint DisplayDevicePrimaryDevice = 0x00000004;
+    private const uint DisplayDeviceMirroringDriver = 0x00000008;
 
     internal static int NativeModeStructureSize => Marshal.SizeOf<DevMode>();
 
-    internal DisplayState GetCurrentState()
+    internal IReadOnlyList<DisplayTarget> GetDisplays()
+    {
+        var displays = new List<DisplayTarget>();
+        for (uint deviceIndex = 0; ; deviceIndex++)
+        {
+            var device = new DisplayDevice
+            {
+                cb = checked((uint)Marshal.SizeOf<DisplayDevice>()),
+                DeviceName = string.Empty,
+                DeviceString = string.Empty,
+                DeviceID = string.Empty,
+                DeviceKey = string.Empty
+            };
+
+            if (!EnumDisplayDevices(null, deviceIndex, ref device, 0))
+            {
+                break;
+            }
+
+            if ((device.StateFlags & DisplayDeviceAttachedToDesktop) == 0
+                || (device.StateFlags & DisplayDeviceMirroringDriver) != 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                var mode = GetCurrentMode(device.DeviceName);
+                var index = displays.Count;
+                displays.Add(new DisplayTarget(
+                    index,
+                    device.DeviceName,
+                    $"Monitor {index + 1}",
+                    (device.StateFlags & DisplayDevicePrimaryDevice) != 0,
+                    mode.dmPositionX,
+                    mode.dmPositionY,
+                    mode.dmPelsWidth,
+                    mode.dmPelsHeight));
+            }
+            catch
+            {
+                // Ignore disconnected or transient display entries.
+            }
+        }
+
+        return displays;
+    }
+
+    internal DisplayTarget? GetDisplay(int requestedIndex)
+    {
+        var displays = GetDisplays();
+        if (displays.Count == 0)
+        {
+            return null;
+        }
+
+        return displays[ResolveDisplayIndex(requestedIndex, displays.Count)];
+    }
+
+    internal static int ResolveDisplayIndex(int requestedIndex, int displayCount) =>
+        displayCount <= 0 ? 0 : Math.Clamp(requestedIndex, 0, displayCount - 1);
+
+    internal DisplayState GetCurrentState(int displayIndex = 0)
     {
         try
         {
-            var mode = GetCurrentMode();
+            var display = GetDisplay(displayIndex)
+                          ?? throw new InvalidOperationException("No active desktop display was found.");
+            var mode = GetCurrentMode(display.DeviceName);
             var orientation = (NativeDisplayOrientation)mode.dmDisplayOrientation;
             return new DisplayState(
                 true,
@@ -60,7 +137,7 @@ internal sealed class DisplayRotationService
                 orientation,
                 mode.dmPelsWidth,
                 mode.dmPelsHeight,
-                $"{mode.dmPelsWidth} × {mode.dmPelsHeight} · {Describe(orientation)}");
+                $"{display.Label}: {mode.dmPelsWidth} × {mode.dmPelsHeight} · {Describe(orientation)}");
         }
         catch (Exception exception)
         {
@@ -74,12 +151,15 @@ internal sealed class DisplayRotationService
         }
     }
 
-    internal RotationResult Toggle(PortraitTurn portraitTurn)
+    internal RotationResult Toggle(PortraitTurn portraitTurn, int displayIndex = 0)
     {
         DevMode mode;
+        DisplayTarget display;
         try
         {
-            mode = GetCurrentMode();
+            display = GetDisplay(displayIndex)
+                      ?? throw new InvalidOperationException("No active desktop display was found.");
+            mode = GetCurrentMode(display.DeviceName);
         }
         catch (Exception exception)
         {
@@ -109,7 +189,7 @@ internal sealed class DisplayRotationService
         mode.dmFields = DmDisplayOrientation | DmPelsWidth | DmPelsHeight;
 
         var test = (DisplayChangeResult)ChangeDisplaySettingsEx(
-            null,
+            display.DeviceName,
             ref mode,
             nint.Zero,
             CdsTest,
@@ -124,7 +204,7 @@ internal sealed class DisplayRotationService
         }
 
         var applied = (DisplayChangeResult)ChangeDisplaySettingsEx(
-            null,
+            display.DeviceName,
             ref mode,
             nint.Zero,
             CdsUpdateRegistry,
@@ -134,7 +214,7 @@ internal sealed class DisplayRotationService
         {
             DisplayChangeResult.Successful => new RotationResult(
                 true,
-                $"Rotated to {Describe(target)}.",
+                $"{display.Label} rotated to {Describe(target)}.",
                 applied),
             DisplayChangeResult.RestartRequired => new RotationResult(
                 false,
@@ -155,7 +235,7 @@ internal sealed class DisplayRotationService
             : NativeDisplayOrientation.Portrait270
         : NativeDisplayOrientation.Landscape;
 
-    private static DevMode GetCurrentMode()
+    private static DevMode GetCurrentMode(string? deviceName)
     {
         if (NativeModeStructureSize != 220)
         {
@@ -169,7 +249,7 @@ internal sealed class DisplayRotationService
             dmSize = checked((ushort)NativeModeStructureSize)
         };
 
-        if (!EnumDisplaySettings(null, EnumCurrentSettings, ref mode))
+        if (!EnumDisplaySettings(deviceName, EnumCurrentSettings, ref mode))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to read the active display mode.");
         }
@@ -228,6 +308,38 @@ internal sealed class DisplayRotationService
         public uint dmPanningWidth;
         public uint dmPanningHeight;
     }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DisplayDevice
+    {
+        public uint cb;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceString;
+
+        public uint StateFlags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceID;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceKey;
+    }
+
+    [DllImport(
+        "user32.dll",
+        EntryPoint = "EnumDisplayDevicesW",
+        CharSet = CharSet.Unicode,
+        SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayDevices(
+        string? deviceName,
+        uint deviceIndex,
+        [In, Out] ref DisplayDevice displayDevice,
+        uint flags);
 
     [DllImport(
         "user32.dll",
