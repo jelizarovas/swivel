@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Swivel.Models;
 using Swivel.Services;
@@ -15,12 +16,14 @@ public partial class OverlayWindow : Window
 
     private readonly App _host;
     private readonly DispatcherTimer _dismissTimer;
+    private readonly DispatcherTimer _settingsHoldTimer;
     private readonly DispatcherTimer _displayDebounceTimer;
     private readonly Stopwatch _countdownStopwatch = new();
     private HwndSource? _source;
     private double _remainingMilliseconds;
     private double _totalMilliseconds;
     private long _lastPositionWarningTimestamp;
+    private bool _settingsHoldTriggered;
 
     internal OverlayWindow(App host)
     {
@@ -32,6 +35,12 @@ public partial class OverlayWindow : Window
             Interval = TimeSpan.FromMilliseconds(40)
         };
         _dismissTimer.Tick += DismissTimer_Tick;
+
+        _settingsHoldTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _settingsHoldTimer.Tick += SettingsHoldTimer_Tick;
 
         _displayDebounceTimer = new DispatcherTimer
         {
@@ -59,7 +68,7 @@ public partial class OverlayWindow : Window
     {
         ApplySettings();
         RefreshTargetText();
-        StatusText.Text = "Touch the reader again to close";
+        StatusText.Visibility = Visibility.Collapsed;
         Opacity = 0;
 
         if (!IsVisible)
@@ -80,6 +89,7 @@ public partial class OverlayWindow : Window
     internal void HideBubble()
     {
         _dismissTimer.Stop();
+        _settingsHoldTimer.Stop();
         _countdownStopwatch.Reset();
         _displayDebounceTimer.Stop();
         if (IsVisible)
@@ -90,7 +100,7 @@ public partial class OverlayWindow : Window
 
     internal void ApplySettings()
     {
-        SettingsButton.Visibility = _host.Settings.ShowSettingsButton
+        SettingsShortcut.Visibility = _host.Settings.ShowSettingsButton
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -150,7 +160,7 @@ public partial class OverlayWindow : Window
     {
         _totalMilliseconds = Math.Max(500, milliseconds);
         _remainingMilliseconds = _totalMilliseconds;
-        DismissProgress.Value = 1;
+        SetDismissProgress(0);
         _countdownStopwatch.Restart();
         _dismissTimer.Start();
     }
@@ -189,11 +199,17 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        DismissProgress.Value = remaining / _totalMilliseconds;
+        SetDismissProgress(1 - (remaining / _totalMilliseconds));
     }
 
     private void RotateButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_settingsHoldTriggered)
+        {
+            _settingsHoldTriggered = false;
+            return;
+        }
+
         PauseDismissTimer();
         var result = _host.RotateDisplay();
         if (result.Success)
@@ -203,6 +219,7 @@ public partial class OverlayWindow : Window
         }
 
         StatusText.Text = result.Message;
+        StatusText.Visibility = Visibility.Visible;
         ArmDismissTimer(5000);
     }
 
@@ -212,17 +229,79 @@ public partial class OverlayWindow : Window
         _host.ShowControlPanel();
     }
 
-    private void BubbleSurface_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e) =>
+    private void RotateButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
+        BeginSettingsHold();
+
+    private void RotateButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
+        EndSettingsHold();
+
+    private void RotateButton_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e) =>
+        EndSettingsHold();
+
+    private void RotateButton_PreviewTouchDown(object sender, TouchEventArgs e) =>
+        BeginSettingsHold();
+
+    private void RotateButton_PreviewTouchUp(object sender, TouchEventArgs e) =>
+        EndSettingsHold();
+
+    private void BeginSettingsHold()
+    {
+        _settingsHoldTriggered = false;
         PauseDismissTimer();
+        _settingsHoldTimer.Stop();
+        _settingsHoldTimer.Start();
+    }
 
-    private void BubbleSurface_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) =>
+    private void EndSettingsHold()
+    {
+        _settingsHoldTimer.Stop();
+        if (_settingsHoldTriggered)
+        {
+            ArmDismissTimer(2000);
+            return;
+        }
+
         ResumeDismissTimer();
+    }
 
-    private void BubbleSurface_TouchDown(object sender, TouchEventArgs e) =>
-        PauseDismissTimer();
+    private void SettingsHoldTimer_Tick(object? sender, EventArgs e)
+    {
+        _settingsHoldTimer.Stop();
+        _settingsHoldTriggered = true;
+        SettingsShortcut.Visibility = Visibility.Visible;
+        SetDismissProgress(0);
+    }
 
-    private void BubbleSurface_TouchUp(object sender, TouchEventArgs e) =>
-        ResumeDismissTimer();
+    private void SetDismissProgress(double progress)
+    {
+        progress = Math.Clamp(progress, 0, 1);
+        if (progress <= 0)
+        {
+            DismissArc.Data = null;
+            return;
+        }
+
+        const double center = 58;
+        const double radius = 53;
+        var angle = Math.Min(359.9, progress * 360);
+        var radians = (angle - 90) * Math.PI / 180;
+        var end = new System.Windows.Point(
+            center + radius * Math.Cos(radians),
+            center + radius * Math.Sin(radians));
+        var figure = new PathFigure
+        {
+            StartPoint = new System.Windows.Point(center, center - radius),
+            IsClosed = false
+        };
+        figure.Segments.Add(new ArcSegment(
+            end,
+            new System.Windows.Size(radius, radius),
+            0,
+            angle > 180,
+            SweepDirection.Clockwise,
+            true));
+        DismissArc.Data = new PathGeometry(new[] { figure });
+    }
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
     {

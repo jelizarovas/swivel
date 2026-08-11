@@ -30,7 +30,7 @@ public sealed class AppSettings
     public BubbleAnchor LandscapeAnchor { get; set; } = BubbleAnchor.MiddleRight;
     public BubbleAnchor PortraitAnchor { get; set; } = BubbleAnchor.BottomCenter;
     public PortraitTurn PortraitTurn { get; set; } = PortraitTurn.Clockwise;
-    public bool ShowSettingsButton { get; set; } = true;
+    public bool ShowSettingsButton { get; set; }
     public bool LaunchAtSignIn { get; set; }
     public double EdgeMarginDips { get; set; } = 32;
 

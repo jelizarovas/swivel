@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Swivel"
+        Icon="pack://application:,,,/Assets/Swivel.ico"
         Width="820"
         Height="800"
         MinWidth="720"
@@ -220,7 +221,7 @@
                                 ValueChanged="DismissDelaySlider_ValueChanged"
                                 Margin="0,10,0,2" />
                         <CheckBox x:Name="ShowSettingsButtonCheckBox"
-                                  Content="Show settings shortcut in bubble"
+                                  Content="Always show Settings under the bubble"
                                   Click="SettingsToggle_Click" />
                     </StackPanel>
                 </Border>

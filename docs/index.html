@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f1e8">
-  <meta name="description" content="Swivel gives a rotating Surface Hub 2S one tiny orientation control.">
-  <meta property="og:title" content="Swivel — Touch. Tap. Swivel.">
-  <meta property="og:description" content="A 280 KB Windows helper for one very large rotating screen.">
+  <meta name="description" content="The tiny free Windows button for screens that physically rotate.">
+  <meta property="og:title" content="Swivel — one tap, ninety degrees, zero menus.">
+  <meta property="og:description" content="Windows made screen rotation a journey. Swivel makes it a button.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://jelizarovas.github.io/swivel/">
   <meta property="og:image" content="https://jelizarovas.github.io/swivel/assets/animation/frame-touch.webp">
-  <title>Swivel — Touch. Tap. Swivel.</title>
+  <title>Swivel — one tap, ninety degrees, zero menus.</title>
   <link rel="icon" href="assets/swivel-mark.svg?v=3" type="image/svg+xml">
   <link rel="preload" href="assets/animation/frame-landscape.webp" as="image" type="image/webp">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <main class="page-shell">
@@ -22,41 +22,50 @@
         <img src="assets/swivel-mark.svg?v=3" width="38" height="38" alt="">
         <span>Swivel</span>
       </div>
-      <div class="prototype-pill"><span></span>Early prototype</div>
+      <a class="donate-link"
+         href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&amp;business=arnas.jelizarovas%40gmail.com&amp;item_name=Swivel+development&amp;currency_code=USD"
+         target="_blank"
+         rel="noopener">Keep Swivel free · Donate</a>
     </header>
 
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span></span>One enormous screen. One tiny button.</p>
-        <h1 id="hero-title">Touch.<br>Tap.<br><em>Swivel.</em></h1>
-        <p class="lede">Because walking across a 50-inch screen to find Display Settings technically counts as cardio.</p>
+        <p class="eyebrow"><span></span>The app hiding inside a 50-inch problem</p>
+        <h1 id="hero-title">One tap.<br>Ninety degrees.<br><em>Zero menus.</em></h1>
+        <p class="lede">Microsoft gave the Surface Hub a rotating stand. Then Windows hid rotation in Settings. So I built the missing button. It’s free, tiny, and does exactly one thing—an increasingly suspicious concept in software.</p>
 
         <div class="downloads" aria-label="Download choices">
           <a class="download download-primary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">
             <span>Download Swivel</span>
-            <small>280 KB</small>
+            <small>337 KB</small>
           </a>
           <a class="download download-secondary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel-standalone.exe">
             <span>Standalone</span>
             <small>68 MiB</small>
           </a>
         </div>
-        <p class="release-meta">Latest: <strong>v0.1.3</strong> · released Aug 10, 2026</p>
+        <p class="release-meta">Latest: <strong>v0.1.4</strong> · released Aug 11, 2026</p>
 
-        <p class="runtime-note"><strong>Try the tiny one first.</strong> If .NET 8 is missing, Windows shows the official install link. Standalone brings the runtime with it.</p>
+        <p class="runtime-note"><strong>Start with 337 KB.</strong> If Windows complains about .NET 8, install it—or grab the 68 MiB version that packed its own.</p>
         <div class="info-actions" aria-label="More information">
           <button type="button" data-open-modal="compatibility">Compatibility</button>
           <button type="button" data-open-modal="background">How it runs</button>
         </div>
       </div>
 
-      <figure class="demo" data-phase="loading" aria-label="A looping 3D demonstration: touch the reader on the display edge, tap the blue button on screen, and swivel the Surface Hub between landscape and portrait.">
+      <figure class="demo" data-phase="loading" data-mode="stand" aria-label="An interactive 3D Swivel demonstration.">
+        <div class="demo-tabs" role="tablist" aria-label="Choose a display setup">
+          <button type="button" role="tab" aria-selected="true" data-demo-mode="stand">Stand</button>
+          <button type="button" role="tab" aria-selected="false" data-demo-mode="wall">Wall mounted</button>
+          <button type="button" role="tab" aria-selected="false" data-demo-mode="monitor">Monitor</button>
+        </div>
         <img class="webgl-fallback" src="assets/animation/frame-landscape.webp" width="960" height="960" alt="" aria-hidden="true">
         <canvas id="swivel-scene" aria-hidden="true"></canvas>
         <div class="scene-shine" aria-hidden="true"></div>
+        <img class="demo-cursor" src="assets/3d/pointer-hand.png" alt="" aria-hidden="true">
         <figcaption>
           <span class="loop-dot"></span>
-          <span id="scene-caption">Touch reader <b>→</b> tap bubble <b>→</b> swivel</span>
+          <span id="scene-caption">Watch once. Then the screen is yours.</span>
         </figcaption>
       </figure>
     </section>
@@ -66,8 +75,8 @@
     <section role="dialog" aria-modal="true" aria-labelledby="compatibility-title">
       <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
       <p class="modal-kicker">Before the first swivel</p>
-      <h2 id="compatibility-title">A charmingly early prototype.</h2>
-      <p>Swivel needs Windows 10/11 Pro or Enterprise. Windows 10 Team is not supported. The app is unsigned, and real Hub reader behavior still needs device testing.</p>
+      <h2 id="compatibility-title">One boring—but important—paragraph.</h2>
+      <p>Swivel needs Windows 10/11 Pro or Enterprise. Windows 10 Team cannot use the fingerprint reader. The app is unsigned, so Windows may ask whether you’re sure. You are still in charge of that decision.</p>
     </section>
   </div>
 
@@ -76,10 +85,10 @@
       <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
       <p class="modal-kicker">Quietly useful</p>
       <h2 id="background-title">It lives in the tray.</h2>
-      <p>Hide or close Settings and Swivel keeps listening from the notification area. It runs only in your signed-in Windows session—not as a system service.</p>
+      <p>Close Settings and Swivel slips into the notification area, where tiny useful apps belong. Hold the blue Swivel button for two seconds whenever you need Settings. It listens only while you’re signed in. No service. No account. No telemetry.</p>
     </section>
   </div>
-  <script src="page.js?v=3"></script>
-  <script type="module" src="swivel-scene.js?v=4"></script>
+  <script src="page.js?v=4"></script>
+  <script type="module" src="swivel-scene.js?v=5"></script>
 </body>
 </html>

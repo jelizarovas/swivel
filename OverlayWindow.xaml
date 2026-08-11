@@ -12,88 +12,94 @@
         SizeToContent="WidthAndHeight"
         Opacity="0"
         SourceInitialized="Window_SourceInitialized">
-    <Grid Background="Transparent" Margin="18">
-        <Border x:Name="BubbleSurface"
-                Background="#F21A202B"
-                BorderBrush="#667A98C8"
-                BorderThickness="1"
-                CornerRadius="28"
-                Padding="12"
-                MouseEnter="BubbleSurface_MouseEnter"
-                MouseLeave="BubbleSurface_MouseLeave"
-                PreviewTouchDown="BubbleSurface_TouchDown"
-                PreviewTouchUp="BubbleSurface_TouchUp">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24"
-                                  ShadowDepth="6"
-                                  Opacity="0.48"
-                                  Color="#000000" />
-            </Border.Effect>
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="RotateButton"
-                            Grid.Column="0"
-                            Width="272"
-                            Height="92"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Click="RotateButton_Click">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="62" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Path Width="43"
-                                  Height="43"
-                                  HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Data="M14,44 C28,48 44,38 45,18 M14,44 L22,35 M14,44 L23,52 M45,18 L37,26 M45,18 L53,26"
-                                  Stroke="White"
-                                  StrokeThickness="4.5"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round"
-                                  StrokeLineJoin="Round"
-                                  Stretch="Uniform" />
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Margin="10,0,8,0">
-                                <TextBlock Text="Rotate display"
-                                           FontSize="19"
-                                           FontWeight="Bold" />
-                                <TextBlock x:Name="TargetText"
-                                           Text="Switch orientation"
-                                           Foreground="#E2E8FF"
-                                           FontSize="13"
-                                           Margin="0,3,0,0" />
-                            </StackPanel>
-                        </Grid>
-                    </Button>
-                    <Button x:Name="SettingsButton"
-                            Grid.Column="2"
-                            Width="96"
-                            Height="92"
-                            Content="Settings"
-                            Click="SettingsButton_Click" />
-                </Grid>
-                <TextBlock x:Name="StatusText"
-                           Text="Touch the reader again to close"
-                           Foreground="#A8B5C8"
-                           FontSize="12"
-                           HorizontalAlignment="Center"
-                           Margin="8,9,8,5" />
-                <ProgressBar x:Name="DismissProgress"
-                             Height="3"
-                             Minimum="0"
-                             Maximum="1"
-                             Value="1"
-                             Foreground="#8FA6FF"
-                             Background="#263246"
-                             BorderThickness="0" />
-            </StackPanel>
-        </Border>
+    <Grid Background="Transparent" Margin="22">
+        <StackPanel HorizontalAlignment="Center">
+            <Grid Width="116" Height="116">
+                <Ellipse Margin="3"
+                         Stroke="#3F6A7898"
+                         StrokeThickness="5" />
+                <Path x:Name="DismissArc"
+                      Stroke="#A8BDCAFF"
+                      StrokeThickness="5"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+                <Button x:Name="RotateButton"
+                        Width="94"
+                        Height="94"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="#5F74ED"
+                        BorderThickness="0"
+                        Click="RotateButton_Click"
+                        PreviewMouseLeftButtonDown="RotateButton_PreviewMouseLeftButtonDown"
+                        PreviewMouseLeftButtonUp="RotateButton_PreviewMouseLeftButtonUp"
+                        LostMouseCapture="RotateButton_LostMouseCapture"
+                        PreviewTouchDown="RotateButton_PreviewTouchDown"
+                        PreviewTouchUp="RotateButton_PreviewTouchUp">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="RoundSurface"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="47">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="24"
+                                                      ShadowDepth="7"
+                                                      Opacity="0.42"
+                                                      Color="#26345F" />
+                                </Border.Effect>
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="RoundSurface" Property="Background" Value="#7185FA" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="RoundSurface" Property="Background" Value="#4B5DCB" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <Path Width="48"
+                          Height="48"
+                          Data="M14,44 C28,48 44,38 45,18 M14,44 L22,35 M14,44 L23,52 M45,18 L37,26 M45,18 L53,26"
+                          Stroke="White"
+                          StrokeThickness="4.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round"
+                          Stretch="Uniform" />
+                </Button>
+            </Grid>
+
+            <Border x:Name="SettingsShortcut"
+                    Margin="0,9,0,0"
+                    Padding="7,6,7,6"
+                    Background="#F51A202B"
+                    BorderBrush="#667A98C8"
+                    BorderThickness="1"
+                    CornerRadius="18"
+                    Visibility="Collapsed">
+                <Button x:Name="SettingsButton"
+                        MinWidth="126"
+                        Padding="16,8"
+                        Content="Open settings"
+                        Click="SettingsButton_Click" />
+            </Border>
+
+            <TextBlock x:Name="TargetText"
+                       Text="Switch orientation"
+                       Visibility="Collapsed" />
+            <TextBlock x:Name="StatusText"
+                       MaxWidth="260"
+                       Margin="0,8,0,0"
+                       Padding="12,7"
+                       Foreground="#EEF2FF"
+                       Background="#E61A202B"
+                       FontSize="12"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed" />
+        </StackPanel>
     </Grid>
 </Window>

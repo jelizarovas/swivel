@@ -3,9 +3,12 @@ import * as THREE from "./vendor/three.module.min.js";
 const canvas = document.querySelector("#swivel-scene");
 const demo = document.querySelector(".demo");
 const caption = document.querySelector("#scene-caption");
+const modeButtons = [...document.querySelectorAll("[data-demo-mode]")];
+const cursorElement = document.querySelector(".demo-cursor");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const requestedTime = Number.parseFloat(new URLSearchParams(window.location.search).get("t"));
 const frozenTime = Number.isFinite(requestedTime) ? requestedTime : null;
+const requestedMode = new URLSearchParams(window.location.search).get("mode");
 
 if (!canvas || !demo) {
   throw new Error("Swivel scene mount is missing.");
@@ -73,6 +76,7 @@ function createUiTexture() {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   let lastAngle = Number.NaN;
+  let lastMode = "";
 
   const roundRect = (x, y, width, height, radius, fill) => {
     context.beginPath();
@@ -81,9 +85,10 @@ function createUiTexture() {
     context.fill();
   };
 
-  const draw = (angle) => {
-    if (Math.abs(angle - lastAngle) < 0.002) return;
+  const draw = (angle, mode = "stand") => {
+    if (Math.abs(angle - lastAngle) < 0.002 && mode === lastMode) return;
     lastAngle = angle;
+    lastMode = mode;
     const width = uiCanvas.width;
     const height = uiCanvas.height;
     const background = context.createLinearGradient(0, 0, width, height);
@@ -108,6 +113,30 @@ function createUiTexture() {
     roundRect(104, 174, 290, 13, 7, "rgba(255,255,255,.25)");
     roundRect(104, 344, 145, 60, 20, "rgba(255,255,255,.26)");
     roundRect(273, 344, 145, 60, 20, "rgba(255,255,255,.18)");
+
+    if (mode === "monitor") {
+      roundRect(0, height - 54, width, 54, 0, "rgba(11,18,34,.88)");
+      roundRect(width - 58, height - 46, 38, 38, 10, "#5f74ed");
+      context.save();
+      context.translate(width - 39, height - 27);
+      context.strokeStyle = "white";
+      context.lineWidth = 4;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.beginPath();
+      context.moveTo(-9, 7);
+      context.bezierCurveTo(0, 10, 9, 2, 8, -8);
+      context.moveTo(-9, 7);
+      context.lineTo(-4, 1);
+      context.moveTo(-9, 7);
+      context.lineTo(-2, 10);
+      context.moveTo(8, -8);
+      context.lineTo(2, -3);
+      context.moveTo(8, -8);
+      context.lineTo(12, -2);
+      context.stroke();
+      context.restore();
+    }
     context.restore();
 
     const shine = context.createLinearGradient(0, 0, width, height);
@@ -121,6 +150,25 @@ function createUiTexture() {
 
   draw(0);
   return { texture, draw };
+}
+
+function createLabelTexture(label) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 160;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "rgba(18,24,38,.94)";
+  context.beginPath();
+  context.roundRect(8, 8, 496, 144, 64);
+  context.fill();
+  context.fillStyle = "#ffffff";
+  context.font = "700 48px Segoe UI, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, 256, 80);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 try {
@@ -169,13 +217,14 @@ try {
   const tire = material(0x69717d, 0.75, 0.05);
   const shelfMaterial = material(0x777e89, 0.38, 0.48);
   const frameMaterial = material(0x11141b, 0.24, 0.5);
+  const wallMaterial = material(0xe9e2d9, 0.88, 0.02);
 
   const stand = new THREE.Group();
   const legSpecs = [
-    [new THREE.Vector3(-1.85, 0.95, 0.12), new THREE.Vector3(-2.48, -2.38, 0.72)],
-    [new THREE.Vector3(1.85, 0.95, 0.12), new THREE.Vector3(2.48, -2.38, 0.72)],
-    [new THREE.Vector3(-1.55, 0.92, -0.48), new THREE.Vector3(-1.76, -2.36, -0.72)],
-    [new THREE.Vector3(1.55, 0.92, -0.48), new THREE.Vector3(1.76, -2.36, -0.72)]
+    [new THREE.Vector3(-1.78, 1.9, 0.02), new THREE.Vector3(-2.48, -2.38, 0.72)],
+    [new THREE.Vector3(1.78, 1.9, 0.02), new THREE.Vector3(2.48, -2.38, 0.72)],
+    [new THREE.Vector3(-1.48, 1.74, -0.54), new THREE.Vector3(-1.76, -2.36, -0.72)],
+    [new THREE.Vector3(1.48, 1.74, -0.54), new THREE.Vector3(1.76, -2.36, -0.72)]
   ];
   for (const [top, bottom] of legSpecs) {
     stand.add(cylinderBetween(top, bottom, 0.095, silver));
@@ -207,23 +256,109 @@ try {
     wheel.add(hub);
     stand.add(wheel);
   }
+  const mountPlate = new THREE.Mesh(new THREE.CylinderGeometry(1.36, 1.36, 0.18, 48), silver);
+  mountPlate.rotation.x = Math.PI / 2;
+  mountPlate.scale.y = 1.2;
+  mountPlate.position.set(0, 1.55, -0.3);
+  mountPlate.castShadow = true;
+  stand.add(mountPlate);
+
+  const mountRibs = new THREE.Group();
+  mountRibs.position.set(0, 1.55, -0.18);
+  for (const x of [-0.76, -0.38, 0, 0.38, 0.76]) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.055, 2.58, 0.055), darkSilver);
+    rib.position.x = x;
+    mountRibs.add(rib);
+  }
+  for (const y of [-0.88, -0.44, 0, 0.44, 0.88]) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.055, 0.055), darkSilver);
+    rib.position.y = y;
+    mountRibs.add(rib);
+  }
+  stand.add(mountRibs);
   scene.add(stand);
 
-  const mount = cylinderBetween(new THREE.Vector3(-1.75, 0.82, -0.1), new THREE.Vector3(1.75, 0.82, -0.1), 0.1, darkSilver);
-  scene.add(mount);
+  const wallMount = new THREE.Group();
+  const wallSurface = new THREE.Mesh(roundedSolid(8.8, 7.2, 0.45, 0.12, 0.03), wallMaterial);
+  wallSurface.position.set(0, 0.28, -0.76);
+  wallSurface.receiveShadow = true;
+  wallMount.add(wallSurface);
 
-  // Keep the panel in a three-quarter isometric pose and physically in front
-  // of the shelf. The parent supplies the fixed yaw while the child swivels
-  // in its own plane, avoiding geometry intersections in portrait mode.
+  const plateShape = new THREE.Shape();
+  plateShape.absarc(0, 0, 2.18, 0, Math.PI * 2, false);
+  const plateOpening = new THREE.Path();
+  plateOpening.moveTo(-0.82, -0.74);
+  plateOpening.lineTo(0.82, -0.74);
+  plateOpening.quadraticCurveTo(0.96, -0.74, 0.96, -0.6);
+  plateOpening.lineTo(0.96, 0.6);
+  plateOpening.quadraticCurveTo(0.96, 0.74, 0.82, 0.74);
+  plateOpening.lineTo(-0.82, 0.74);
+  plateOpening.quadraticCurveTo(-0.96, 0.74, -0.96, 0.6);
+  plateOpening.lineTo(-0.96, -0.6);
+  plateOpening.quadraticCurveTo(-0.96, -0.74, -0.82, -0.74);
+  plateShape.holes.push(plateOpening);
+  const plateGeometry = new THREE.ExtrudeGeometry(plateShape, {
+    depth: 0.18,
+    curveSegments: 48,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    bevelSize: 0.035,
+    bevelThickness: 0.035
+  });
+  plateGeometry.translate(0, 0, -0.09);
+  const wallPlate = new THREE.Mesh(plateGeometry, silver);
+  wallPlate.position.set(0, 0.3, -0.5);
+  wallPlate.castShadow = true;
+  wallMount.add(wallPlate);
+
+  for (const [x, y] of [[-1.54, 1.08], [1.54, 1.08], [-1.54, -1.08], [1.54, -1.08]]) {
+    const slot = new THREE.Mesh(roundedSolid(0.46, 0.12, 0.06, 0.045, 0.012), darkSilver);
+    slot.position.set(x, y + 0.3, -0.38);
+    wallMount.add(slot);
+  }
+  wallMount.visible = false;
+  scene.add(wallMount);
+
+  const monitorStand = new THREE.Group();
+  const monitorStem = cylinderBetween(
+    new THREE.Vector3(0, -2.25, -0.1),
+    new THREE.Vector3(0, 0.52, -0.1),
+    0.16,
+    silver,
+    24);
+  monitorStand.add(monitorStem);
+  const monitorNeck = cylinderBetween(
+    new THREE.Vector3(-1.5, 0.52, -0.1),
+    new THREE.Vector3(1.5, 0.52, -0.1),
+    0.13,
+    darkSilver,
+    24);
+  monitorStand.add(monitorNeck);
+  const monitorBase = new THREE.Mesh(roundedSolid(3.25, 0.82, 0.3, 0.2, 0.04), darkSilver);
+  monitorBase.rotation.x = -Math.PI / 2;
+  monitorBase.position.set(0, -2.42, 0.12);
+  monitorBase.castShadow = true;
+  monitorStand.add(monitorBase);
+  monitorStand.visible = false;
+  scene.add(monitorStand);
+
+  // Pitch the panel back around its horizontal axis. The camera supplies the
+  // isometric side view; the screen itself stays square to its physical mount.
   const displayMount = new THREE.Group();
   displayMount.position.set(0, 1.55, 0.82);
-  displayMount.rotation.y = -0.22;
+  displayMount.rotation.x = -0.14;
   scene.add(displayMount);
 
   const display = new THREE.Group();
   displayMount.add(display);
 
-  const frame = new THREE.Mesh(roundedSolid(5.72, 3.34, 0.22, 0.24, 0.055), frameMaterial);
+  const chassis = new THREE.Mesh(roundedSolid(5.88, 3.5, 0.27, 0.28, 0.055), silver);
+  chassis.castShadow = true;
+  chassis.receiveShadow = true;
+  display.add(chassis);
+
+  const frame = new THREE.Mesh(roundedSolid(5.72, 3.34, 0.22, 0.11, 0.04), frameMaterial);
+  frame.position.z = 0.07;
   frame.castShadow = true;
   frame.receiveShadow = true;
   display.add(frame);
@@ -231,7 +366,7 @@ try {
   const ui = createUiTexture();
   const screenMaterial = new THREE.MeshBasicMaterial({ map: ui.texture, toneMapped: false });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(5.32, 2.94), screenMaterial);
-  screen.position.z = 0.205;
+  screen.position.z = 0.225;
   display.add(screen);
 
   const glass = new THREE.Mesh(
@@ -247,7 +382,7 @@ try {
       depthWrite: false
     })
   );
-  glass.position.z = 0.218;
+  glass.position.z = 0.238;
   glass.renderOrder = 3;
   display.add(glass);
 
@@ -255,7 +390,7 @@ try {
     new THREE.PlaneGeometry(1.25, 2.72),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.09, depthWrite: false })
   );
-  reflection.position.set(-1.55, 0.5, 0.224);
+  reflection.position.set(-1.55, 0.5, 0.244);
   reflection.rotation.z = -0.52;
   reflection.renderOrder = 4;
   display.add(reflection);
@@ -264,6 +399,7 @@ try {
   reader.position.set(2.96, 0, 0.02);
   const readerBody = new THREE.Mesh(roundedSolid(0.28, 0.7, 0.12, 0.25, 0.025), silver);
   readerBody.castShadow = true;
+  readerBody.userData.action = "trigger";
   reader.add(readerBody);
   const readerInset = new THREE.Mesh(
     new THREE.CircleGeometry(0.095, 24),
@@ -291,10 +427,59 @@ try {
     depthTest: false,
     toneMapped: false
   });
+  const bubbleGroup = new THREE.Group();
+  bubbleGroup.position.set(2.03, 0, 0.265);
+  bubbleGroup.renderOrder = 10;
+  display.add(bubbleGroup);
+
   const bubble = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.72), bubbleMaterial);
-  bubble.position.set(2.03, 0, 0.245);
+  bubble.userData.action = "bubble";
   bubble.renderOrder = 10;
-  display.add(bubble);
+  bubbleGroup.add(bubble);
+
+  const ringPoints = [];
+  for (let index = 0; index <= 72; index += 1) {
+    const angle = -Math.PI / 2 + (index / 72) * Math.PI * 2;
+    ringPoints.push(new THREE.Vector3(Math.cos(angle) * 0.43, Math.sin(angle) * 0.43, 0.012));
+  }
+  const ringGeometry = new THREE.BufferGeometry().setFromPoints(ringPoints);
+  const ringBackground = new THREE.Line(
+    ringGeometry.clone(),
+    new THREE.LineBasicMaterial({ color: 0x26345f, transparent: true, opacity: 0.35, depthTest: false }));
+  ringBackground.renderOrder = 11;
+  bubbleGroup.add(ringBackground);
+  const ringProgress = new THREE.Line(
+    ringGeometry,
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false }));
+  ringProgress.geometry.setDrawRange(0, 1);
+  ringProgress.renderOrder = 12;
+  bubbleGroup.add(ringProgress);
+
+  const settingsMaterial = new THREE.MeshBasicMaterial({
+    map: createLabelTexture("Open settings"),
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    toneMapped: false
+  });
+  const settingsBubble = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 0.51), settingsMaterial);
+  settingsBubble.position.set(0, -0.72, 0.014);
+  settingsBubble.renderOrder = 13;
+  bubbleGroup.add(settingsBubble);
+
+  const trayHit = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.58, 0.42),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
+  trayHit.position.set(2.36, -1.26, 0.255);
+  trayHit.userData.action = "trigger";
+  display.add(trayHit);
+
+  const rightEdgeHit = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 3.42, 0.72),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
+  rightEdgeHit.position.set(2.8, 0, 0.05);
+  rightEdgeHit.userData.action = "edge";
+  display.add(rightEdgeHit);
 
   const pointerMaterial = new THREE.SpriteMaterial({
     map: pointerTexture,
@@ -366,36 +551,339 @@ try {
     return getWorldPosition(localCorner).add(new THREE.Vector3(0.46, 0.42, 0.9));
   }
 
+  const raycaster = new THREE.Raycaster();
+  const rayPosition = new THREE.Vector2();
+  const cameraGoal = new THREE.Vector3(7.2, 5.4, 11.5);
+  const cameraLook = new THREE.Vector3(0, 0.25, 0);
+  let currentMode = "stand";
+  let guided = !reduceMotion;
+  let guidedStartedAt = performance.now();
+  let lastActivityAt = performance.now();
+  let lastFrameAt = performance.now();
+  let physicalProgress = 0;
+  let physicalTarget = 0;
+  let contentProgress = 0;
+  let contentTarget = 0;
+  let bubbleVisible = false;
+  let bubbleShownAt = 0;
+  let settingsVisibleUntil = 0;
+  let pressedAction = null;
+  let pressedAt = 0;
+  let bubbleHoldTriggered = false;
+  let dragState = null;
+
+  function applyMode(mode) {
+    currentMode = mode;
+    demo.dataset.mode = mode;
+    stand.visible = mode === "stand";
+    wallMount.visible = mode === "wall";
+    monitorStand.visible = mode === "monitor";
+    stage.visible = mode !== "wall";
+    reader.visible = mode !== "monitor";
+    trayHit.visible = mode === "monitor";
+
+    displayMount.rotation.y = 0;
+    if (mode === "wall") {
+      displayMount.position.set(0, 0.3, -0.12);
+      displayMount.rotation.x = 0;
+      display.scale.setScalar(0.92);
+      cameraGoal.set(0, 0.6, 13);
+      cameraLook.set(0, 0.28, 0);
+    } else if (mode === "monitor") {
+      displayMount.position.set(0, 1.38, 0.62);
+      displayMount.rotation.x = -0.1;
+      display.scale.setScalar(0.84);
+      cameraGoal.set(6.8, 4.8, 11.8);
+      cameraLook.set(0, 0.1, 0);
+    } else {
+      displayMount.position.set(0, 1.55, 0.82);
+      displayMount.rotation.x = -0.14;
+      display.scale.setScalar(1);
+      cameraGoal.set(7.2, 5.4, 11.5);
+      cameraLook.set(0, 0.25, 0);
+    }
+
+    for (const button of modeButtons) {
+      button.setAttribute("aria-selected", String(button.dataset.demoMode === mode));
+    }
+  }
+
+  function restartGuide(message = "Watch once. Then the screen is yours.") {
+    guided = !reduceMotion;
+    guidedStartedAt = performance.now();
+    physicalProgress = 0;
+    physicalTarget = 0;
+    contentProgress = 0;
+    contentTarget = 0;
+    bubbleVisible = false;
+    settingsVisibleUntil = 0;
+    dragState = null;
+    demo.classList.remove("is-interactive", "is-dragging", "pointer-inside");
+    setPhase("guided", message);
+  }
+
+  function enterInteractive() {
+    guided = false;
+    physicalProgress = 0;
+    physicalTarget = 0;
+    contentProgress = 0;
+    contentTarget = 0;
+    bubbleVisible = false;
+    settingsVisibleUntil = 0;
+    pointer.visible = false;
+    grip.visible = false;
+    lastActivityAt = performance.now();
+    demo.classList.add("is-interactive");
+    setPhase(
+      "interactive",
+      currentMode === "monitor"
+        ? "Now you try it — click Swivel in the tray."
+        : "Now you try it — touch the fingerprint reader.");
+  }
+
+  function noteActivity() {
+    lastActivityAt = performance.now();
+  }
+
+  function findAction(event) {
+    const rect = canvas.getBoundingClientRect();
+    rayPosition.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(rayPosition, camera);
+    const hits = raycaster.intersectObjects([bubble, readerBody, trayHit, rightEdgeHit], false);
+    for (const hit of hits) {
+      const action = hit.object.userData.action;
+      if (action === "bubble" && bubbleVisible) return action;
+      if (action === "trigger") {
+        if (currentMode === "monitor" && hit.object === trayHit) return action;
+        if (currentMode !== "monitor" && hit.object === readerBody) return action;
+      }
+      if (action === "edge" && Math.abs(contentTarget - physicalProgress) > 0.02) return action;
+    }
+    return null;
+  }
+
+  function updateInteractiveCaption() {
+    if (dragState) {
+      const distance = Math.round(Math.abs(physicalProgress - dragState.startProgress) * 100);
+      setPhase("dragging", `Keep going… <b>${distance}%</b> of 85%`);
+    } else if (Math.abs(contentTarget - physicalProgress) > 0.025) {
+      setPhase(
+        "ready-to-swivel",
+        contentTarget > physicalProgress
+          ? "Drag the right edge down. 85% commits."
+          : "Drag the lower edge back up. 85% commits.");
+    } else if (bubbleVisible) {
+      setPhase("bubble-live", "Tap Swivel—or hold it 2 seconds for Settings.");
+    } else if (physicalProgress > 0.98) {
+      setPhase(
+        "portrait-ready",
+        currentMode === "monitor"
+          ? "Portrait. Click the tray icon to go back."
+          : "Portrait. Touch the reader to go back.");
+    } else {
+      setPhase(
+        "interactive",
+        currentMode === "monitor"
+          ? "Now you try it — click Swivel in the tray."
+          : "Now you try it — touch the fingerprint reader.");
+    }
+  }
+
+  function showBubble(now) {
+    bubbleVisible = true;
+    bubbleShownAt = now;
+    settingsVisibleUntil = 0;
+    updateInteractiveCaption();
+  }
+
+  function activateBubble() {
+    bubbleVisible = false;
+    settingsVisibleUntil = 0;
+    contentTarget = contentTarget > 0.5 ? 0 : 1;
+    updateInteractiveCaption();
+  }
+
+  canvas.addEventListener("pointerenter", () => {
+    if (!guided) demo.classList.add("pointer-inside");
+  });
+  canvas.addEventListener("pointerleave", () => {
+    if (!dragState) demo.classList.remove("pointer-inside");
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (guided) return;
+    noteActivity();
+    const demoRect = demo.getBoundingClientRect();
+    if (cursorElement) {
+      cursorElement.style.left = `${event.clientX - demoRect.left}px`;
+      cursorElement.style.top = `${event.clientY - demoRect.top}px`;
+    }
+
+    if (dragState) {
+      const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
+      physicalProgress = clamp(
+        dragState.startProgress + (event.clientY - dragState.startY) / dragDistance);
+      physicalTarget = physicalProgress;
+      updateInteractiveCaption();
+      return;
+    }
+
+    const action = findAction(event);
+    if (cursorElement) {
+      cursorElement.src = action === "edge"
+        ? "assets/3d/grip-hand.png"
+        : "assets/3d/pointer-hand.png";
+    }
+  });
+  canvas.addEventListener("pointerdown", (event) => {
+    if (guided) return;
+    noteActivity();
+    const action = findAction(event);
+    pressedAction = action;
+    pressedAt = performance.now();
+    bubbleHoldTriggered = false;
+    if (action === "edge") {
+      dragState = {
+        startY: event.clientY,
+        startProgress: physicalProgress,
+        destination: contentTarget
+      };
+      demo.classList.add("is-dragging");
+    }
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic accessibility/testing events may not own a native pointer.
+    }
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    if (guided) return;
+    noteActivity();
+    const now = performance.now();
+    if (dragState) {
+      const fullDistance = Math.max(0.001, Math.abs(dragState.destination - dragState.startProgress));
+      const travelled = Math.abs(physicalProgress - dragState.startProgress) / fullDistance;
+      physicalTarget = travelled >= 0.85
+        ? dragState.destination
+        : dragState.startProgress;
+      dragState = null;
+      demo.classList.remove("is-dragging");
+      updateInteractiveCaption();
+    } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
+      bubbleVisible ? (bubbleVisible = false) : showBubble(now);
+      updateInteractiveCaption();
+    } else if (pressedAction === "bubble" && findAction(event) === "bubble") {
+      if (bubbleHoldTriggered) {
+        settingsVisibleUntil = now + 2200;
+        bubbleShownAt = now;
+      } else {
+        activateBubble();
+      }
+    }
+    pressedAction = null;
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointercancel", (event) => {
+    if (dragState) {
+      physicalTarget = dragState.startProgress;
+      dragState = null;
+    }
+    pressedAction = null;
+    demo.classList.remove("is-dragging");
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  });
+
+  for (const button of modeButtons) {
+    button.addEventListener("click", () => {
+      applyMode(button.dataset.demoMode || "stand");
+      restartGuide(`A quick ${button.textContent.trim()} version. Then you take over.`);
+    });
+  }
+
+  applyMode(["stand", "wall", "monitor"].includes(requestedMode) ? requestedMode : "stand");
+  if (reduceMotion) enterInteractive();
+
   function animate(time) {
-    const t = frozenTime ?? (reduceMotion ? 0 : (time / 1000) % 18);
+    const deltaSeconds = Math.min(0.05, Math.max(0, (time - lastFrameAt) / 1000));
+    lastFrameAt = time;
+    camera.position.lerp(cameraGoal, 1 - Math.exp(-deltaSeconds * 7));
+    camera.lookAt(cameraLook);
+
+    if (!guided && time - lastActivityAt >= 20000) {
+      restartGuide("Need a hand? Here it comes.");
+    }
+
+    if (!guided) {
+      const ease = 1 - Math.exp(-deltaSeconds * 8.5);
+      if (!dragState) physicalProgress = mix(physicalProgress, physicalTarget, ease);
+      contentProgress = mix(contentProgress, contentTarget, ease);
+      if (Math.abs(physicalProgress - physicalTarget) < 0.001) physicalProgress = physicalTarget;
+      if (Math.abs(contentProgress - contentTarget) < 0.001) contentProgress = contentTarget;
+
+      if (bubbleVisible && time - bubbleShownAt >= 4200 && settingsVisibleUntil <= time) {
+        bubbleVisible = false;
+        updateInteractiveCaption();
+      }
+
+      if (pressedAction === "bubble" && !bubbleHoldTriggered && time - pressedAt >= 2000) {
+        bubbleHoldTriggered = true;
+        settingsVisibleUntil = time + 2200;
+        bubbleShownAt = time;
+        setPhase("settings-reveal", "There it is: Settings, without cluttering every tap.");
+      }
+
+      const bubbleProgress = bubbleVisible ? clamp((time - bubbleShownAt) / 4200) : 0;
+      const settingsOpacity = settingsVisibleUntil > time ? 1 : 0;
+      display.rotation.z = mix(0, -Math.PI / 2, physicalProgress);
+      ui.draw(mix(0, Math.PI / 2, contentProgress), currentMode);
+      bubbleGroup.rotation.z = -display.rotation.z;
+      bubbleMaterial.opacity = bubbleVisible ? 1 : 0;
+      bubbleGroup.scale.setScalar(bubbleVisible ? 1 : 0.25);
+      bubbleGroup.visible = bubbleVisible;
+      ringProgress.geometry.setDrawRange(0, Math.max(1, Math.floor(bubbleProgress * ringPoints.length)));
+      settingsMaterial.opacity = settingsOpacity;
+      settingsBubble.visible = settingsOpacity > 0;
+      pointer.visible = false;
+      grip.visible = false;
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+      return;
+    }
+
+    const t = frozenTime ?? (time - guidedStartedAt) / 1000;
     let panelAngle = 0;
     let contentAngle = 0;
     let bubbleOpacity = 0;
     let bubbleScale = 0.25;
+    let bubbleProgress = 0;
     let pointerOpacity = 1;
     let pointerPress = 0;
     let pointerPortraitAmount = 0;
-    let pointerFromTarget = "sensor";
-    let pointerToTarget = "sensor";
+    const triggerTarget = currentMode === "monitor" ? "tray" : "sensor";
+    let pointerFromTarget = triggerTarget;
+    let pointerToTarget = triggerTarget;
     let pointerMove = 1;
     let gripOpacity = 0;
     let gripCorner = new THREE.Vector3(2.82, 1.63, 0.2);
 
     if (t < 1.15) {
-      setPhase("landscape", "Touch reader <b>→</b> tap bubble <b>→</b> swivel");
+      setPhase("landscape", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the fingerprint reader");
     } else if (t < 2.2) {
-      setPhase("touch-reader", "Touch the edge reader");
+      setPhase("touch-reader", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the edge reader");
       pointerPress = segment(t, 1.82, 2.08) * (1 - segment(t, 2.08, 2.2));
     } else if (t < 3.05) {
       setPhase("bubble-appears", "The blue button appears on screen");
       bubbleOpacity = segment(t, 2.2, 2.58);
       bubbleScale = mix(0.25, 1, segment(t, 2.2, 2.68));
+      bubbleProgress = segment(t, 2.2, 4.2) * 0.46;
       pointerToTarget = "bubble";
       pointerMove = segment(t, 2.48, 3.02);
     } else if (t < 4.2) {
       setPhase("tap-bubble", "Tap the blue button");
       bubbleOpacity = 1;
       bubbleScale = 1;
+      bubbleProgress = mix(0.46, 0.63, segment(t, 3.05, 4.2));
       pointerFromTarget = "bubble";
       pointerToTarget = "bubble";
       pointerPress = segment(t, 3.82, 4.05) * (1 - segment(t, 4.05, 4.2));
@@ -413,7 +901,7 @@ try {
       const takeGrip = segment(t, 5.15, 5.68);
       const releaseGrip = segment(t, 6.82, 7.25);
       pointerFromTarget = takeGrip < 1 ? "bubble" : "grip";
-      pointerToTarget = releaseGrip > 0 ? "sensor" : "grip";
+      pointerToTarget = releaseGrip > 0 ? triggerTarget : "grip";
       pointerMove = releaseGrip > 0 ? releaseGrip : takeGrip;
       pointerPortraitAmount = releaseGrip;
       pointerOpacity = 1 - takeGrip + releaseGrip;
@@ -424,7 +912,7 @@ try {
       panelAngle = -Math.PI / 2;
       pointerPortraitAmount = 1;
     } else if (t < 9.45) {
-      setPhase("touch-reader-portrait", "Touch the reader at the bottom");
+      setPhase("touch-reader-portrait", currentMode === "monitor" ? "Click the tray icon again" : "Touch the reader at the bottom");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
       pointerPortraitAmount = 1;
@@ -463,28 +951,38 @@ try {
       const takeGrip = segment(t, 12.4, 12.88);
       const releaseGrip = segment(t, 14.08, 14.55);
       pointerFromTarget = takeGrip < 1 ? "bubble" : "grip";
-      pointerToTarget = releaseGrip > 0 ? "sensor" : "grip";
+      pointerToTarget = releaseGrip > 0 ? triggerTarget : "grip";
       pointerMove = releaseGrip > 0 ? releaseGrip : takeGrip;
       pointerPortraitAmount = 1 - releaseGrip;
       pointerOpacity = 1 - takeGrip + releaseGrip;
       gripOpacity = takeGrip * (1 - releaseGrip);
     } else {
-      setPhase("done", "And somehow no Settings maze was involved");
+      if (frozenTime === null) {
+        enterInteractive();
+        requestAnimationFrame(animate);
+        return;
+      }
+      setPhase("done", "Now you try it.");
     }
 
     display.rotation.z = panelAngle;
-    ui.draw(contentAngle);
-    bubble.rotation.z = -panelAngle;
+    ui.draw(contentAngle, currentMode);
+    bubbleGroup.rotation.z = -panelAngle;
     bubbleMaterial.opacity = bubbleOpacity;
-    bubble.scale.setScalar(bubbleScale);
-    bubble.visible = bubbleOpacity > 0.002;
+    bubbleGroup.scale.setScalar(bubbleScale);
+    bubbleGroup.visible = bubbleOpacity > 0.002;
+    ringProgress.geometry.setDrawRange(0, Math.max(1, Math.floor(bubbleProgress * ringPoints.length)));
+    settingsMaterial.opacity = 0;
+    settingsBubble.visible = false;
 
     if (pointerOpacity > 0.002) {
       const sensorTarget = getWorldPosition(new THREE.Vector3(2.96, 0, 0.32));
       const bubbleTarget = getWorldPosition(new THREE.Vector3(2.03, 0, 0.34));
+      const trayTarget = getWorldPosition(new THREE.Vector3(2.36, -1.26, 0.3));
       const gripTarget = getGripPosition(gripCorner);
       const resolvePointerTarget = (name) => {
         if (name === "grip") return gripTarget;
+        if (name === "tray") return getPointerPosition(trayTarget, pointerPortraitAmount, pointerPress, false);
         const isSensor = name === "sensor";
         return getPointerPosition(isSensor ? sensorTarget : bubbleTarget, pointerPortraitAmount, pointerPress, isSensor);
       };
@@ -503,7 +1001,7 @@ try {
     }
 
     renderer.render(scene, camera);
-    if (!reduceMotion && frozenTime === null) requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
   }
 
   function resize() {

@@ -73,26 +73,38 @@ body::before {
   filter: drop-shadow(0 7px 13px rgba(76, 94, 204, 0.25));
 }
 
-.prototype-pill,
+.donate-link,
 .eyebrow,
 .runtime-note,
 .demo figcaption {
   color: var(--soft-ink);
 }
 
-.prototype-pill {
-  display: flex;
+.donate-link {
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 12px;
+  justify-content: center;
+  padding: 9px 14px;
+  color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
   font-size: 0.76rem;
-  font-weight: 680;
+  font-weight: 740;
+  transition: transform 150ms ease, background 150ms ease;
 }
 
-.prototype-pill span,
+.donate-link:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.donate-link:focus-visible {
+  outline: 3px solid rgba(95, 116, 237, 0.3);
+  outline-offset: 2px;
+}
+
 .eyebrow span,
 .loop-dot {
   width: 7px;
@@ -105,6 +117,7 @@ body::before {
 
 .hero {
   min-height: 0;
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(360px, 0.82fr) minmax(460px, 1.18fr);
   align-items: center;
@@ -113,6 +126,7 @@ body::before {
 
 .hero-copy {
   z-index: 2;
+  min-width: 0;
   max-width: 610px;
 }
 
@@ -129,9 +143,9 @@ body::before {
 
 h1 {
   margin: 0;
-  font-size: clamp(4.2rem, 8.2vw, 8.4rem);
-  line-height: 0.78;
-  letter-spacing: -0.075em;
+  font-size: clamp(3.7rem, 6.4vw, 6.9rem);
+  line-height: 0.84;
+  letter-spacing: -0.068em;
   font-weight: 830;
 }
 
@@ -156,6 +170,7 @@ h1 em {
 }
 
 .download {
+  min-width: 0;
   min-height: 55px;
   padding: 10px 17px;
   display: inline-flex;
@@ -261,6 +276,7 @@ h1 em {
 
 .demo {
   position: relative;
+  min-width: 0;
   width: min(100%, calc(100svh - 118px));
   aspect-ratio: 1;
   max-height: calc(100svh - 118px);
@@ -275,6 +291,45 @@ h1 em {
   touch-action: none;
 }
 
+.demo-tabs {
+  position: absolute;
+  z-index: 8;
+  top: 18px;
+  left: 50%;
+  display: flex;
+  padding: 4px;
+  border: 1px solid rgba(23, 24, 33, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: 0 8px 28px rgba(48, 41, 55, 0.1);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+
+.demo-tabs button {
+  padding: 7px 12px;
+  color: #6c6972;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: clamp(0.62rem, 0.78vw, 0.74rem);
+  font-weight: 740;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.demo-tabs button[aria-selected="true"] {
+  color: white;
+  background: var(--ink);
+  box-shadow: 0 4px 12px rgba(23, 24, 33, 0.18);
+}
+
+.demo-tabs button:focus-visible {
+  outline: 3px solid rgba(95, 116, 237, 0.3);
+  outline-offset: 2px;
+}
+
 .webgl-fallback,
 #swivel-scene,
 .scene-shine {
@@ -282,6 +337,37 @@ h1 em {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.demo-cursor {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  top: 0;
+  width: 94px;
+  height: auto;
+  display: none;
+  pointer-events: none;
+  filter: drop-shadow(0 9px 12px rgba(48, 41, 55, 0.18));
+  transform: translate(-20%, -18%);
+  transform-origin: 28% 18%;
+}
+
+.demo.is-interactive {
+  cursor: none;
+}
+
+.demo.is-interactive .demo-tabs button {
+  cursor: pointer;
+}
+
+.demo.is-interactive.pointer-inside .demo-cursor {
+  display: block;
+}
+
+.demo.is-dragging .demo-cursor {
+  width: 106px;
+  transform: translate(-30%, -30%) rotate(-16deg);
 }
 
 .webgl-fallback {
@@ -317,7 +403,7 @@ h1 em {
 .demo figcaption {
   position: absolute;
   z-index: 6;
-  left: 24px;
+  left: 50%;
   bottom: 22px;
   display: flex;
   align-items: center;
@@ -330,6 +416,8 @@ h1 em {
   backdrop-filter: blur(12px);
   font-size: clamp(0.68rem, 0.85vw, 0.82rem);
   font-weight: 720;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .demo figcaption b {
@@ -418,7 +506,7 @@ h1 em {
     padding: 16px 18px 18px;
   }
 
-  .prototype-pill {
+  .donate-link {
     padding: 7px 9px;
     font-size: 0.66rem;
   }
@@ -440,14 +528,14 @@ h1 em {
   }
 
   h1 {
-    font-size: clamp(3.15rem, 15vw, 4.4rem);
-    line-height: 0.8;
+    font-size: clamp(2.35rem, 10.5vw, 3.4rem);
+    line-height: 0.86;
   }
 
   .lede {
     margin-top: 14px;
-    font-size: 0.94rem;
-    line-height: 1.42;
+    font-size: 0.88rem;
+    line-height: 1.38;
   }
 
   .downloads {
@@ -475,14 +563,31 @@ h1 em {
   }
 
   .demo figcaption {
-    left: 12px;
+    left: 50%;
     bottom: 11px;
     padding: 7px 10px;
     font-size: 0.62rem;
   }
+
+  .demo-tabs {
+    top: 10px;
+  }
+
+  .demo-tabs button {
+    padding: 6px 9px;
+    font-size: 0.58rem;
+  }
 }
 
 @media (max-width: 480px) {
+  .page-shell {
+    padding-inline: 14px;
+  }
+
+  .hero {
+    align-content: start;
+  }
+
   .brand span {
     font-size: 1rem;
   }
@@ -492,22 +597,25 @@ h1 em {
     height: 34px;
   }
 
-  .prototype-pill {
-    max-width: 160px;
+  .donate-link {
+    max-width: 146px;
+    padding-inline: 10px;
+    font-size: 0.62rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .downloads {
-    gap: 8px;
+    width: 100%;
+    gap: 6px;
   }
 
   .download {
     flex: 1 1 0;
     gap: 7px;
-    padding-inline: 9px;
-    font-size: 0.82rem;
+    padding-inline: 7px;
+    font-size: 0.78rem;
   }
 
   .download-primary {
@@ -522,6 +630,15 @@ h1 em {
     padding: 3px 5px;
     font-size: 0.59rem;
   }
+
+  .runtime-note {
+    display: none;
+  }
+
+  .demo {
+    width: min(100%, 32svh);
+    max-height: 32svh;
+  }
 }
 
 @media (max-height: 730px) and (min-width: 861px) {
@@ -531,7 +648,7 @@ h1 em {
   }
 
   h1 {
-    font-size: clamp(4rem, 7vw, 6.4rem);
+    font-size: clamp(3.2rem, 5.4vw, 5.2rem);
   }
 
   .lede {

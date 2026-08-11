@@ -105,7 +105,7 @@ public partial class App : System.Windows.Application
         _fingerprintMonitor.StatusChanged += OnFingerprintStatusChanged;
         _fingerprintMonitor.DiagnosticWarning += OnFingerprintDiagnosticWarning;
 
-        _logger.Info("Swivel 0.1.3 started.");
+        _logger.Info("Swivel 0.1.4 started.");
         _logger.Info($"Settings: {_settingsStore.SettingsPath}");
         _logger.Info($"Diagnostics: {_logger.LogPath}");
 
@@ -440,14 +440,17 @@ public partial class App : System.Windows.Application
         Icon? icon = null;
         try
         {
-            if (Environment.ProcessPath is { } processPath)
+            var resource = GetResourceStream(
+                new Uri("pack://application:,,,/Assets/Swivel.ico"));
+            if (resource is not null)
             {
-                icon = Icon.ExtractAssociatedIcon(processPath);
+                using var source = new Icon(resource.Stream);
+                icon = (Icon)source.Clone();
             }
         }
-        catch
+        catch (Exception exception)
         {
-            // A generic system icon is sufficient for an unsigned prototype.
+            _logger?.Warn($"Could not load the Swivel tray icon: {exception.Message}");
         }
 
         _trayIcon = new Forms.NotifyIcon
