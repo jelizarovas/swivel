@@ -212,9 +212,16 @@ try {
   const mount = cylinderBetween(new THREE.Vector3(-1.75, 0.82, -0.1), new THREE.Vector3(1.75, 0.82, -0.1), 0.1, darkSilver);
   scene.add(mount);
 
+  // Keep the panel in a three-quarter isometric pose and physically in front
+  // of the shelf. The parent supplies the fixed yaw while the child swivels
+  // in its own plane, avoiding geometry intersections in portrait mode.
+  const displayMount = new THREE.Group();
+  displayMount.position.set(0, 1.55, 0.82);
+  displayMount.rotation.y = -0.22;
+  scene.add(displayMount);
+
   const display = new THREE.Group();
-  display.position.set(0, 1.55, 0.18);
-  scene.add(display);
+  displayMount.add(display);
 
   const frame = new THREE.Mesh(roundedSolid(5.72, 3.34, 0.22, 0.24, 0.055), frameMaterial);
   frame.castShadow = true;
@@ -331,12 +338,16 @@ try {
     return display.localToWorld(local.clone());
   }
 
-  function placePointer(target, portrait, opacity, press = 0, isSensor = false) {
-    const offset = portrait
-      ? new THREE.Vector3(0, -0.9 + press * 0.11, 0.92)
-      : new THREE.Vector3((isSensor ? 1.9 : 1.62) - press * 0.11, 0, 0.92);
-    pointer.position.copy(target).add(offset);
-    pointerMaterial.rotation = portrait ? -Math.PI / 2 : 0;
+  function getPointerPosition(target, portraitAmount, press = 0, isSensor = false) {
+    const landscapeOffset = new THREE.Vector3((isSensor ? 1.9 : 1.62) - press * 0.11, 0, 0.92);
+    const portraitOffset = new THREE.Vector3(0, -0.9 + press * 0.11, 0.92);
+    const offset = landscapeOffset.lerp(portraitOffset, portraitAmount);
+    return target.clone().add(offset);
+  }
+
+  function placePointer(position, portraitAmount, opacity, press = 0) {
+    pointer.position.copy(position);
+    pointerMaterial.rotation = mix(0, -Math.PI / 2, portraitAmount);
     pointerMaterial.opacity = clamp(opacity);
     const squeeze = 1 - press * 0.06;
     pointer.scale.set(2.45 * squeeze, 1.48 * squeeze, 1);
@@ -351,16 +362,22 @@ try {
     grip.visible = opacity > 0.002;
   }
 
+  function getGripPosition(localCorner) {
+    return getWorldPosition(localCorner).add(new THREE.Vector3(0.46, 0.42, 0.9));
+  }
+
   function animate(time) {
     const t = frozenTime ?? (reduceMotion ? 0 : (time / 1000) % 18);
     let panelAngle = 0;
     let contentAngle = 0;
     let bubbleOpacity = 0;
     let bubbleScale = 0.25;
-    let pointerOpacity = 0;
+    let pointerOpacity = 1;
     let pointerPress = 0;
-    let portraitPointer = false;
-    let pointerTarget = "sensor";
+    let pointerPortraitAmount = 0;
+    let pointerFromTarget = "sensor";
+    let pointerToTarget = "sensor";
+    let pointerMove = 1;
     let gripOpacity = 0;
     let gripCorner = new THREE.Vector3(2.82, 1.63, 0.2);
 
@@ -368,58 +385,66 @@ try {
       setPhase("landscape", "Touch reader <b>→</b> tap bubble <b>→</b> swivel");
     } else if (t < 2.2) {
       setPhase("touch-reader", "Touch the edge reader");
-      pointerOpacity = segment(t, 1.15, 1.55);
       pointerPress = segment(t, 1.82, 2.08) * (1 - segment(t, 2.08, 2.2));
     } else if (t < 3.05) {
       setPhase("bubble-appears", "The blue button appears on screen");
-      pointerOpacity = 1 - segment(t, 2.45, 3.05);
       bubbleOpacity = segment(t, 2.2, 2.58);
       bubbleScale = mix(0.25, 1, segment(t, 2.2, 2.68));
+      pointerToTarget = "bubble";
+      pointerMove = segment(t, 2.48, 3.02);
     } else if (t < 4.2) {
       setPhase("tap-bubble", "Tap the blue button");
       bubbleOpacity = 1;
       bubbleScale = 1;
-      pointerTarget = "bubble";
-      pointerOpacity = segment(t, 3.05, 3.45);
+      pointerFromTarget = "bubble";
+      pointerToTarget = "bubble";
       pointerPress = segment(t, 3.82, 4.05) * (1 - segment(t, 4.05, 4.2));
       bubbleScale = 1 - pointerPress * 0.14;
     } else if (t < 5.15) {
       setPhase("pixels-turn", "Windows turns the pixels first");
       contentAngle = mix(0, Math.PI / 2, segment(t, 4.2, 5.1));
       bubbleOpacity = 1 - segment(t, 4.2, 4.55);
-      pointerOpacity = 1 - segment(t, 4.2, 4.58);
-      pointerTarget = "bubble";
+      pointerFromTarget = "bubble";
+      pointerToTarget = "bubble";
     } else if (t < 7.25) {
       setPhase("swivel-portrait", "Now swivel the right side down");
       contentAngle = Math.PI / 2;
-      gripOpacity = segment(t, 5.15, 5.55) * (1 - segment(t, 6.9, 7.25));
       panelAngle = mix(0, -Math.PI / 2, segment(t, 5.55, 6.95));
+      const takeGrip = segment(t, 5.15, 5.68);
+      const releaseGrip = segment(t, 6.82, 7.25);
+      pointerFromTarget = takeGrip < 1 ? "bubble" : "grip";
+      pointerToTarget = releaseGrip > 0 ? "sensor" : "grip";
+      pointerMove = releaseGrip > 0 ? releaseGrip : takeGrip;
+      pointerPortraitAmount = releaseGrip;
+      pointerOpacity = 1 - takeGrip + releaseGrip;
+      gripOpacity = takeGrip * (1 - releaseGrip);
     } else if (t < 8.4) {
       setPhase("portrait", "Portrait. Very dignified.");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
+      pointerPortraitAmount = 1;
     } else if (t < 9.45) {
       setPhase("touch-reader-portrait", "Touch the reader at the bottom");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
-      portraitPointer = true;
-      pointerOpacity = segment(t, 8.4, 8.78);
+      pointerPortraitAmount = 1;
       pointerPress = segment(t, 9.03, 9.27) * (1 - segment(t, 9.27, 9.45));
     } else if (t < 10.3) {
       setPhase("bubble-portrait", "The button follows the reader");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
-      portraitPointer = true;
-      pointerOpacity = 1 - segment(t, 9.72, 10.3);
+      pointerPortraitAmount = 1;
+      pointerToTarget = "bubble";
+      pointerMove = segment(t, 9.72, 10.26);
       bubbleOpacity = segment(t, 9.45, 9.82);
       bubbleScale = mix(0.25, 1, segment(t, 9.45, 9.92));
     } else if (t < 11.45) {
       setPhase("tap-bubble-portrait", "Tap once more");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
-      portraitPointer = true;
-      pointerTarget = "bubble";
-      pointerOpacity = segment(t, 10.3, 10.65);
+      pointerPortraitAmount = 1;
+      pointerFromTarget = "bubble";
+      pointerToTarget = "bubble";
       pointerPress = segment(t, 11.02, 11.25) * (1 - segment(t, 11.25, 11.45));
       bubbleOpacity = 1;
       bubbleScale = 1 - pointerPress * 0.14;
@@ -427,15 +452,22 @@ try {
       setPhase("pixels-return", "Windows turns the pixels back");
       contentAngle = mix(Math.PI / 2, 0, segment(t, 11.45, 12.35));
       panelAngle = -Math.PI / 2;
-      portraitPointer = true;
-      pointerTarget = "bubble";
-      pointerOpacity = 1 - segment(t, 11.45, 11.82);
+      pointerPortraitAmount = 1;
+      pointerFromTarget = "bubble";
+      pointerToTarget = "bubble";
       bubbleOpacity = 1 - segment(t, 11.45, 11.8);
     } else if (t < 14.55) {
       setPhase("swivel-landscape", "Lift the right side back up");
       panelAngle = mix(-Math.PI / 2, 0, segment(t, 12.8, 14.2));
       gripCorner = new THREE.Vector3(-2.82, 1.63, 0.2);
-      gripOpacity = segment(t, 12.4, 12.8) * (1 - segment(t, 14.2, 14.55));
+      const takeGrip = segment(t, 12.4, 12.88);
+      const releaseGrip = segment(t, 14.08, 14.55);
+      pointerFromTarget = takeGrip < 1 ? "bubble" : "grip";
+      pointerToTarget = releaseGrip > 0 ? "sensor" : "grip";
+      pointerMove = releaseGrip > 0 ? releaseGrip : takeGrip;
+      pointerPortraitAmount = 1 - releaseGrip;
+      pointerOpacity = 1 - takeGrip + releaseGrip;
+      gripOpacity = takeGrip * (1 - releaseGrip);
     } else {
       setPhase("done", "And somehow no Settings maze was involved");
     }
@@ -450,8 +482,16 @@ try {
     if (pointerOpacity > 0.002) {
       const sensorTarget = getWorldPosition(new THREE.Vector3(2.96, 0, 0.32));
       const bubbleTarget = getWorldPosition(new THREE.Vector3(2.03, 0, 0.34));
-      targetWorld.copy(pointerTarget === "bubble" ? bubbleTarget : sensorTarget);
-      placePointer(targetWorld, portraitPointer, pointerOpacity, pointerPress, pointerTarget === "sensor");
+      const gripTarget = getGripPosition(gripCorner);
+      const resolvePointerTarget = (name) => {
+        if (name === "grip") return gripTarget;
+        const isSensor = name === "sensor";
+        return getPointerPosition(isSensor ? sensorTarget : bubbleTarget, pointerPortraitAmount, pointerPress, isSensor);
+      };
+      fromWorld.copy(resolvePointerTarget(pointerFromTarget));
+      toWorld.copy(resolvePointerTarget(pointerToTarget));
+      targetWorld.lerpVectors(fromWorld, toWorld, pointerMove);
+      placePointer(targetWorld, pointerPortraitAmount, pointerOpacity, pointerPress);
     } else {
       pointer.visible = false;
     }
