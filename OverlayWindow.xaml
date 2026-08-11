@@ -47,11 +47,17 @@
                                 <ColumnDefinition Width="62" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="⟳"
-                                       FontSize="42"
-                                       FontWeight="Normal"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
+                            <Path Width="43"
+                                  Height="43"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Data="M14,44 C28,48 44,38 45,18 M14,44 L22,35 M14,44 L23,52 M45,18 L37,26 M45,18 L53,26"
+                                  Stroke="White"
+                                  StrokeThickness="4.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Stretch="Uniform" />
                             <StackPanel Grid.Column="1"
                                         VerticalAlignment="Center"
                                         Margin="10,0,8,0">
