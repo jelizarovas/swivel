@@ -26,8 +26,9 @@ Swivel rotates the Windows desktop; it does **not** motorize the physical stand.
 - The default landscape position is right-center.
 - The default portrait position is bottom-center.
 - The Rotate button safely tests the requested display mode before applying it.
-- Settings can change the timeout, both positions, portrait direction, Settings-button visibility, and launch-at-sign-in behavior.
-- A **Simulate fingerprint touch** button makes the full bubble flow testable on a computer without a reader.
+- Touch-friendly chips change both positions and which physical edge moves down.
+- Settings save automatically; there is no separate Save button.
+- A **Test bubble** button makes the full bubble flow testable on a computer without a reader.
 
 ## First Surface Hub test
 
@@ -38,9 +39,9 @@ The Hub must run Windows 10/11 Pro or Enterprise. The Surface Hub Fingerprint Re
 3. If you prefer a larger file that carries its own runtime, download [`Swivel-standalone.exe`](https://github.com/jelizarovas/swivel/releases/latest/download/Swivel-standalone.exe) instead.
 4. Confirm that the **Fingerprint reader** card says Swivel is listening.
 5. Touch the reader once and confirm the bubble appears.
-6. Use **Simulate fingerprint touch** if the reader is not available yet.
+6. Use **Test bubble** if the reader is not available yet.
 7. Press **Rotate display** only when ready to test the Hub's real display orientation.
-8. If portrait turns the wrong way, change **How the panel turns into portrait**.
+8. The Hub stand normally uses **Right side down**. If your mount turns the other way, choose **Left side down**.
 9. Enable **Launch Swivel automatically when I sign in** only after the reader, rotation, lock/unlock, and sleep/resume checks pass.
 
 The executable is currently unsigned, so Windows SmartScreen may show an unknown-publisher warning.
@@ -88,7 +89,8 @@ Both profiles produce single-file executables. `Compact` is about 218 KB and rel
 ## Current verification boundary
 
 - Confirmed locally: clean Release compilation, settings round-trip, display-mode inspection, placement calculations, simulated bubble rendering, tray startup, fingerprint-reader absence handling, and graceful shutdown.
-- Not yet confirmed: the Surface Hub reader's unclaimed-event support, live Hub rotation direction, Hub DPI placement, lock/unlock behavior, sleep/resume behavior, and launch-at-sign-in on the Hub.
+- Surface Hub testing found the original right-side-down mapping was reversed; v0.1.2 corrects it. The corrected mapping still needs a device re-test.
+- Not yet confirmed: the Surface Hub reader's unclaimed-event support, corrected live rotation direction, Hub DPI placement, lock/unlock behavior, sleep/resume behavior, and launch-at-sign-in on the Hub.
 
 ## Source license
 

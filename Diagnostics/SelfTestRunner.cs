@@ -36,6 +36,18 @@ internal static class SelfTestRunner
             $"DEVMODEW size is {DisplayRotationService.NativeModeStructureSize} (expected 220)",
             lines,
             ref failed);
+        Check(
+            DisplayRotationService.GetTargetOrientation(true, PortraitTurn.Clockwise)
+                == NativeDisplayOrientation.Portrait90,
+            "Right-side-down swivel maps to portrait 90",
+            lines,
+            ref failed);
+        Check(
+            DisplayRotationService.GetTargetOrientation(true, PortraitTurn.CounterClockwise)
+                == NativeDisplayOrientation.Portrait270,
+            "Left-side-down swivel maps to portrait 270",
+            lines,
+            ref failed);
 
         var temporaryDirectory = Path.Combine(Path.GetTempPath(), $"swivel-self-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporaryDirectory);

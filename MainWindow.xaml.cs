@@ -1,5 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using Swivel.Models;
 using Swivel.Services;
 using MediaBrush = System.Windows.Media.Brush;
@@ -10,34 +13,47 @@ namespace Swivel;
 public partial class MainWindow : Window
 {
     private readonly App _host;
+    private readonly DispatcherTimer _saveTimer;
+    private bool _isLoadingSettings = true;
 
     internal MainWindow(App host)
     {
         _host = host;
         InitializeComponent();
 
+        _saveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+        _saveTimer.Tick += (_, _) =>
+        {
+            _saveTimer.Stop();
+            _ = SaveSettings();
+        };
+
         var anchorChoices = new[]
         {
             new Choice<BubbleAnchor>("Top left", BubbleAnchor.TopLeft),
-            new Choice<BubbleAnchor>("Top center", BubbleAnchor.TopCenter),
+            new Choice<BubbleAnchor>("Top", BubbleAnchor.TopCenter),
             new Choice<BubbleAnchor>("Top right", BubbleAnchor.TopRight),
-            new Choice<BubbleAnchor>("Left center", BubbleAnchor.MiddleLeft),
+            new Choice<BubbleAnchor>("Left", BubbleAnchor.MiddleLeft),
             new Choice<BubbleAnchor>("Center", BubbleAnchor.Center),
-            new Choice<BubbleAnchor>("Right center", BubbleAnchor.MiddleRight),
+            new Choice<BubbleAnchor>("Right", BubbleAnchor.MiddleRight),
             new Choice<BubbleAnchor>("Bottom left", BubbleAnchor.BottomLeft),
-            new Choice<BubbleAnchor>("Bottom center", BubbleAnchor.BottomCenter),
+            new Choice<BubbleAnchor>("Bottom", BubbleAnchor.BottomCenter),
             new Choice<BubbleAnchor>("Bottom right", BubbleAnchor.BottomRight)
         };
 
-        LandscapePositionCombo.ItemsSource = anchorChoices;
-        PortraitPositionCombo.ItemsSource = anchorChoices;
-        PortraitTurnCombo.ItemsSource = new[]
+        LandscapePositionChips.ItemsSource = anchorChoices;
+        PortraitPositionChips.ItemsSource = anchorChoices;
+        PortraitTurnChips.ItemsSource = new[]
         {
-            new Choice<PortraitTurn>("Clockwise", PortraitTurn.Clockwise),
-            new Choice<PortraitTurn>("Counter-clockwise", PortraitTurn.CounterClockwise)
+            new Choice<PortraitTurn>("Right side down", PortraitTurn.Clockwise),
+            new Choice<PortraitTurn>("Left side down", PortraitTurn.CounterClockwise)
         };
 
         LoadSettings(_host.Settings);
+        _isLoadingSettings = false;
         LoadDiagnostics();
         UpdateFingerprintStatus(_host.FingerprintStatus);
         RefreshDisplayStatus();
@@ -49,13 +65,13 @@ public partial class MainWindow : Window
     internal void RefreshDisplayStatus()
     {
         var state = _host.GetDisplayState();
-        DisplayStatusText.Text = state.IsAvailable
-            ? $"Current display: {state.Message}. The Rotate button changes the real Windows display."
-            : state.Message;
+        DisplayStatusText.Text = state.IsAvailable ? state.Message : "Display status unavailable";
+        DisplayStatusText.ToolTip = state.Message;
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _saveTimer.Stop();
         _host.LogLineAdded -= OnLogLineAdded;
         _host.FingerprintStatusChanged -= OnFingerprintStatusChanged;
         base.OnClosed(e);
@@ -65,9 +81,9 @@ public partial class MainWindow : Window
     {
         DismissDelaySlider.Value = settings.DismissDelayMilliseconds / 1000.0;
         ShowSettingsButtonCheckBox.IsChecked = settings.ShowSettingsButton;
-        LandscapePositionCombo.SelectedValue = settings.LandscapeAnchor;
-        PortraitPositionCombo.SelectedValue = settings.PortraitAnchor;
-        PortraitTurnCombo.SelectedValue = settings.PortraitTurn;
+        LandscapePositionChips.SelectedValue = settings.LandscapeAnchor;
+        PortraitPositionChips.SelectedValue = settings.PortraitAnchor;
+        PortraitTurnChips.SelectedValue = settings.PortraitTurn;
         LaunchAtSignInCheckBox.IsChecked = settings.LaunchAtSignIn;
         UpdateDelayText();
     }
@@ -76,13 +92,13 @@ public partial class MainWindow : Window
     {
         DismissDelayMilliseconds = (int)Math.Round(DismissDelaySlider.Value * 1000),
         ShowSettingsButton = ShowSettingsButtonCheckBox.IsChecked == true,
-        LandscapeAnchor = LandscapePositionCombo.SelectedValue is BubbleAnchor landscape
+        LandscapeAnchor = LandscapePositionChips.SelectedValue is BubbleAnchor landscape
             ? landscape
             : BubbleAnchor.MiddleRight,
-        PortraitAnchor = PortraitPositionCombo.SelectedValue is BubbleAnchor portrait
+        PortraitAnchor = PortraitPositionChips.SelectedValue is BubbleAnchor portrait
             ? portrait
             : BubbleAnchor.BottomCenter,
-        PortraitTurn = PortraitTurnCombo.SelectedValue is PortraitTurn turn
+        PortraitTurn = PortraitTurnChips.SelectedValue is PortraitTurn turn
             ? turn
             : PortraitTurn.Clockwise,
         LaunchAtSignIn = LaunchAtSignInCheckBox.IsChecked == true,
@@ -91,10 +107,39 @@ public partial class MainWindow : Window
 
     private bool SaveSettings()
     {
+        if (_isLoadingSettings)
+        {
+            return true;
+        }
+
         var saved = _host.TryApplySettings(ReadSettingsFromControls(), out var message);
-        SaveStatusText.Text = message;
+        SaveStatusText.Text = saved ? "Saved automatically" : message;
         SaveStatusText.Foreground = (MediaBrush)FindResource(saved ? "SuccessBrush" : "ErrorBrush");
         return saved;
+    }
+
+    private void QueueSave()
+    {
+        if (_isLoadingSettings)
+        {
+            return;
+        }
+
+        SaveStatusText.Text = "Saving…";
+        SaveStatusText.Foreground = (MediaBrush)FindResource("MutedTextBrush");
+        _saveTimer.Stop();
+        _saveTimer.Start();
+    }
+
+    private bool FlushPendingSave()
+    {
+        if (!_saveTimer.IsEnabled)
+        {
+            return true;
+        }
+
+        _saveTimer.Stop();
+        return SaveSettings();
     }
 
     private void LoadDiagnostics()
@@ -124,7 +169,15 @@ public partial class MainWindow : Window
 
     private void UpdateFingerprintStatus(FingerprintStatus status)
     {
-        FingerprintStatusText.Text = status.Message;
+        FingerprintStatusText.Text = status.State switch
+        {
+            FingerprintMonitorState.Listening => "Reader ready",
+            FingerprintMonitorState.Error => "Reader error",
+            FingerprintMonitorState.Unsupported => "Not supported",
+            _ => "Connecting…"
+        };
+        FingerprintStatusText.ToolTip = status.Message;
+
         var resourceName = status.State switch
         {
             FingerprintMonitorState.Listening => "SuccessBrush",
@@ -139,13 +192,21 @@ public partial class MainWindow : Window
     {
         if (DismissDelayValueText is not null)
         {
-            DismissDelayValueText.Text = $"{DismissDelaySlider.Value:0.#} seconds";
+            DismissDelayValueText.Text = $"{DismissDelaySlider.Value:0.#} s";
         }
     }
 
     private void DismissDelaySlider_ValueChanged(
         object sender,
-        RoutedPropertyChangedEventArgs<double> e) => UpdateDelayText();
+        RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateDelayText();
+        QueueSave();
+    }
+
+    private void SettingsSelection_Changed(object sender, SelectionChangedEventArgs e) => QueueSave();
+
+    private void SettingsToggle_Click(object sender, RoutedEventArgs e) => QueueSave();
 
     private void RetryReader_Click(object sender, RoutedEventArgs e)
     {
@@ -154,24 +215,47 @@ public partial class MainWindow : Window
 
     private void SimulateTouch_Click(object sender, RoutedEventArgs e)
     {
-        if (SaveSettings())
+        if (FlushPendingSave())
         {
             _host.SimulateFingerprintTouch();
         }
     }
 
-    private void Save_Click(object sender, RoutedEventArgs e)
-    {
-        _ = SaveSettings();
-    }
-
     private void Hide_Click(object sender, RoutedEventArgs e)
     {
+        _ = FlushPendingSave();
+        Hide();
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            return;
+        }
+
+        DragMove();
+    }
+
+    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void CloseToTray_Click(object sender, RoutedEventArgs e)
+    {
+        _ = FlushPendingSave();
         Hide();
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e)
     {
+        _ = FlushPendingSave();
         _host.RequestExit();
     }
 
@@ -179,12 +263,12 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(_host.LogPath))
         {
-            SaveStatusText.Text = "The diagnostics path is not available yet.";
+            SaveStatusText.Text = "Log path unavailable";
             return;
         }
 
         WpfClipboard.SetText(_host.LogPath);
-        SaveStatusText.Text = "Diagnostics path copied.";
+        SaveStatusText.Text = "Log path copied";
         SaveStatusText.Foreground = (MediaBrush)FindResource("SuccessBrush");
     }
 
@@ -195,6 +279,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _ = FlushPendingSave();
         e.Cancel = true;
         Hide();
     }

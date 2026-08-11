@@ -1,111 +1,195 @@
 <Window x:Class="Swivel.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Swivel"
-        Width="760"
-        Height="840"
-        MinWidth="680"
-        MinHeight="680"
+        Width="820"
+        Height="800"
+        MinWidth="720"
+        MinHeight="650"
+        WindowStyle="None"
+        ResizeMode="CanResize"
         Background="{StaticResource AppBackgroundBrush}"
         Foreground="{StaticResource TextBrush}"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="70"
+                            CornerRadius="18"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="8"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
         <DataTemplate x:Key="ChoiceItemTemplate">
             <TextBlock Text="{Binding Label}"
-                       Foreground="#111827" />
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Center" />
         </DataTemplate>
+
+        <Style x:Key="ChoiceChipStyle" TargetType="ListBoxItem">
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Margin" Value="0,0,7,7" />
+            <Setter Property="Padding" Value="13,9" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#202633" />
+            <Setter Property="BorderBrush" Value="#3B4455" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Chip"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="22"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="#293142" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="#CAD5FF" />
+                                <Setter TargetName="Chip" Property="BorderBrush" Value="#CAD5FF" />
+                                <Setter Property="Foreground" Value="#17224B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WideChoiceChipStyle" TargetType="ListBoxItem" BasedOn="{StaticResource ChoiceChipStyle}">
+            <Setter Property="MinWidth" Value="148" />
+        </Style>
+
+        <Style x:Key="ChoiceChipListStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ItemTemplate" Value="{StaticResource ChoiceItemTemplate}" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ChoiceChipStyle}" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SlimVerticalScrollBarStyle" TargetType="ScrollBar">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Margin" Value="4,5,3,5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Width="12" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Background="#596277" CornerRadius="6" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
+
     <Grid Background="{StaticResource AppBackgroundBrush}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="30">
-                <Grid Margin="2,0,2,24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="Swivel"
-                                   FontSize="34"
-                                   FontWeight="Bold" />
-                        <TextBlock Text="A tiny rotation control for your Surface Hub"
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   FontSize="15"
-                                   Margin="0,5,0,0" />
-                    </StackPanel>
-                    <Border Grid.Column="1"
-                            Background="#18253A"
-                            BorderBrush="#304766"
-                            BorderThickness="1"
-                            CornerRadius="14"
-                            Padding="12,7"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="PROTOTYPE 0.1"
-                                   Foreground="#AFC5FF"
-                                   FontWeight="SemiBold"
-                                   FontSize="12" />
-                    </Border>
-                </Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="Fingerprint reader"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <Grid Margin="0,16,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Ellipse x:Name="FingerprintStatusDot"
-                                     Width="12"
-                                     Height="12"
-                                     Fill="{StaticResource WarningBrush}"
-                                     VerticalAlignment="Top"
-                                     Margin="0,5,12,0" />
-                            <StackPanel Grid.Column="1">
-                                <TextBlock x:Name="FingerprintStatusText"
-                                           Text="Starting the reader probe…"
-                                           FontSize="15"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="Swivel receives only an unused-scan signal; it never reads or stores a fingerprint."
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           FontSize="13"
-                                           Margin="0,5,18,0" />
-                            </StackPanel>
-                            <Button Grid.Column="2"
-                                    Content="Retry"
-                                    Click="RetryReader_Click"
-                                    VerticalAlignment="Top" />
-                        </Grid>
-                    </StackPanel>
+        <Grid Margin="28,18,20,14" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="42" Height="42" CornerRadius="13" Background="#748DFF" Margin="0,0,13,0">
+                    <TextBlock Text="↻" Foreground="White" FontSize="27" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
+                <StackPanel>
+                    <TextBlock Text="Swivel" FontSize="26" FontWeight="SemiBold" />
+                    <TextBlock Text="Surface Hub rotation" Foreground="{StaticResource MutedTextBrush}" FontSize="13" />
+                </StackPanel>
+            </StackPanel>
+            <Border Grid.Column="1" Background="#20283A" CornerRadius="16" Padding="12,7" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="FingerprintStatusDot" Width="9" Height="9" Fill="{StaticResource WarningBrush}" Margin="0,0,8,0" />
+                    <TextBlock x:Name="FingerprintStatusText" Text="Connecting…" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+            <Button Grid.Column="2"
+                    Content="−"
+                    Style="{StaticResource WindowControlButtonStyle}"
+                    ToolTip="Minimize"
+                    Click="Minimize_Click"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+            <Button Grid.Column="3"
+                    Content="×"
+                    Style="{StaticResource WindowControlButtonStyle}"
+                    ToolTip="Hide to tray"
+                    Click="CloseToTray_Click"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+        </Grid>
 
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      PanningMode="VerticalOnly"
+                      PanningDeceleration="0.001"
+                      CanContentScroll="False"
+                      Stylus.IsFlicksEnabled="True">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimVerticalScrollBarStyle}" />
+            </ScrollViewer.Resources>
+            <StackPanel Margin="28,0,20,12">
                 <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="Test it here"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <TextBlock Text="Your current computer can simulate the Hub reader. One trigger shows the bubble; another trigger hides it."
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   FontSize="13"
-                                   Margin="0,6,0,16" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="14" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0"
-                                    Content="Simulate fingerprint touch"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="SimulateTouch_Click" />
-                            <Button Grid.Column="2"
-                                    Content="Hide to notification area"
-                                    Click="Hide_Click" />
-                        </Grid>
-                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Reader" Style="{StaticResource SectionTitleStyle}" />
+                            <TextBlock Text="Only unused-touch events. No fingerprint data." Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,12,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Retry" Click="RetryReader_Click" Padding="16,8" />
+                        <Button Grid.Column="3" Content="Test bubble" Style="{StaticResource PrimaryButtonStyle}" Click="SimulateTouch_Click" Padding="18,8" />
+                    </Grid>
                 </Border>
 
                 <Border Style="{StaticResource CardStyle}">
@@ -115,21 +199,10 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Bubble behavior"
-                                           FontSize="18"
-                                           FontWeight="SemiBold" />
-                                <TextBlock Text="The countdown pauses while the bubble is being touched."
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           FontSize="13"
-                                           Margin="0,5,0,0" />
-                            </StackPanel>
-                            <TextBlock x:Name="DismissDelayValueText"
-                                       Grid.Column="1"
-                                       Foreground="#BFD0FF"
-                                       FontSize="16"
-                                       FontWeight="SemiBold"
-                                       VerticalAlignment="Center" />
+                            <TextBlock Text="Bubble" Style="{StaticResource SectionTitleStyle}" />
+                            <Border Grid.Column="1" Background="#242C3D" CornerRadius="14" Padding="11,5">
+                                <TextBlock x:Name="DismissDelayValueText" Foreground="#CAD5FF" FontSize="13" FontWeight="SemiBold" />
+                            </Border>
                         </Grid>
                         <Slider x:Name="DismissDelaySlider"
                                 Minimum="0.5"
@@ -137,129 +210,89 @@
                                 TickFrequency="0.5"
                                 IsSnapToTickEnabled="True"
                                 ValueChanged="DismissDelaySlider_ValueChanged"
-                                Margin="0,18,0,14" />
+                                Margin="0,10,0,2" />
                         <CheckBox x:Name="ShowSettingsButtonCheckBox"
-                                  Content="Show the Settings button inside the rotation bubble" />
+                                  Content="Show settings shortcut in bubble"
+                                  Click="SettingsToggle_Click" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="Placement and direction"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <Grid Margin="0,16,0,0">
+                        <TextBlock Text="Bubble position" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,15" />
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="18" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Landscape bubble"
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           Margin="0,0,0,7" />
-                                <ComboBox x:Name="LandscapePositionCombo"
-                                          ItemTemplate="{StaticResource ChoiceItemTemplate}"
-                                          SelectedValuePath="Value" />
+                                <TextBlock Text="LANDSCAPE" Style="{StaticResource FieldLabelStyle}" />
+                                <ListBox x:Name="LandscapePositionChips"
+                                         Style="{StaticResource ChoiceChipListStyle}"
+                                         SelectedValuePath="Value"
+                                         SelectionChanged="SettingsSelection_Changed" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Portrait bubble"
-                                           Foreground="{StaticResource MutedTextBrush}"
-                                           Margin="0,0,0,7" />
-                                <ComboBox x:Name="PortraitPositionCombo"
-                                          ItemTemplate="{StaticResource ChoiceItemTemplate}"
-                                          SelectedValuePath="Value" />
+                                <TextBlock Text="PORTRAIT" Style="{StaticResource FieldLabelStyle}" />
+                                <ListBox x:Name="PortraitPositionChips"
+                                         Style="{StaticResource ChoiceChipListStyle}"
+                                         SelectedValuePath="Value"
+                                         SelectionChanged="SettingsSelection_Changed" />
                             </StackPanel>
                         </Grid>
-                        <StackPanel Margin="0,16,0,0">
-                            <TextBlock Text="How the panel turns into portrait"
-                                       Foreground="{StaticResource MutedTextBrush}"
-                                       Margin="0,0,0,7" />
-                            <ComboBox x:Name="PortraitTurnCombo"
-                                      ItemTemplate="{StaticResource ChoiceItemTemplate}"
-                                      SelectedValuePath="Value" />
-                        </StackPanel>
-                        <Border Background="#10151E"
-                                BorderBrush="#252E3C"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Padding="12"
-                                Margin="0,16,0,0">
-                            <TextBlock x:Name="DisplayStatusText"
-                                       Foreground="{StaticResource MutedTextBrush}" />
-                        </Border>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Text="Startup"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <CheckBox x:Name="LaunchAtSignInCheckBox"
-                                  Content="Launch Swivel automatically when I sign in"
-                                  Margin="0,14,0,0" />
-                        <TextBlock Text="Enable this on the Hub only after the reader and rotation tests pass. Keep the EXE in its permanent folder before enabling it."
-                                   Foreground="{StaticResource MutedTextBrush}"
-                                   FontSize="13"
-                                   Margin="0,8,0,0" />
+                        <TextBlock Text="Physical swivel" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Choose which edge of the landscape panel moves down." Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,12" />
+                        <ListBox x:Name="PortraitTurnChips"
+                                 Style="{StaticResource ChoiceChipListStyle}"
+                                 ItemContainerStyle="{StaticResource WideChoiceChipStyle}"
+                                 SelectedValuePath="Value"
+                                 SelectionChanged="SettingsSelection_Changed" />
+                        <TextBlock x:Name="DisplayStatusText" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="2,7,0,0" />
                     </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Diagnostics"
-                                       FontSize="18"
-                                       FontWeight="SemiBold" />
-                            <Button Grid.Column="1"
-                                    Content="Copy log path"
-                                    Click="CopyLogPath_Click"
-                                    Padding="12,7" />
-                        </Grid>
+                    <CheckBox x:Name="LaunchAtSignInCheckBox"
+                              Content="Launch when I sign in"
+                              Click="SettingsToggle_Click" />
+                </Border>
+
+                <Expander Header="Diagnostics" Foreground="{StaticResource MutedTextBrush}" Margin="4,2,4,4">
+                    <StackPanel Margin="0,10,0,0">
                         <TextBox x:Name="DiagnosticsTextBox"
-                                 Height="140"
-                                 Margin="0,14,0,0"
+                                 Height="120"
                                  Padding="12"
-                                 Background="#0A0D12"
+                                 Background="#090B10"
                                  Foreground="#B9C5D6"
-                                 BorderBrush="#252E3C"
+                                 BorderBrush="#303746"
                                  IsReadOnly="True"
                                  TextWrapping="NoWrap"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  FontFamily="Cascadia Mono, Consolas"
                                  FontSize="11" />
+                        <Button Content="Copy log path" Click="CopyLogPath_Click" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="15,7" />
                     </StackPanel>
-                </Border>
-
-                <TextBlock x:Name="SaveStatusText"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           Margin="3,0,0,10" />
-                <Grid Margin="0,0,0,18">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"
-                            Content="Save settings"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Click="Save_Click" />
-                    <Button Grid.Column="2"
-                            Content="Hide"
-                            Click="Hide_Click" />
-                    <Button Grid.Column="4"
-                            Content="Exit Swivel"
-                            Click="Exit_Click" />
-                </Grid>
+                </Expander>
             </StackPanel>
         </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="28,12,28,22">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SaveStatusText" Text="Settings save automatically" Foreground="{StaticResource MutedTextBrush}" FontSize="12" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="Hide" Click="Hide_Click" />
+            <Button Grid.Column="3" Content="Exit" Click="Exit_Click" />
+        </Grid>
     </Grid>
 </Window>

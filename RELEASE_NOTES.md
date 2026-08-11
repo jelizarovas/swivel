@@ -1,32 +1,24 @@
-# Swivel v0.1.1
+# Swivel v0.1.2
 
-The tiny-build and tiny-website release of Swivel.
+The right-side-down Surface Hub test build.
 
-## Included
+## Fixed
 
-- A compact single-file Windows build of about 218 KB. If .NET 8 Desktop Runtime is missing, Windows shows the required framework and official download link.
-- A self-contained fallback build that carries the desktop runtime with it.
-- A one-viewport website with no navigation or scrolling.
-- A four-frame isometric animation: touch the reader, reveal the on-screen bubble, click it, then swivel to portrait.
-- One unused fingerprint-reader event toggles the rotation bubble.
-- The bubble disappears after two untouched seconds by default.
-- Landscape and portrait bubble positions are configurable.
-- Portrait direction and timeout are configurable.
-- A simulated fingerprint touch makes the complete flow testable without Hub hardware.
-- Optional launch at sign in.
-- Local-only settings and diagnostics; no account, cloud service, analytics, or biometric storage.
+- Corrected the portrait mapping for the Hub stand: lowering the right side now requests Windows portrait 90 instead of portrait 270.
+- Replaced ambiguous clockwise/counter-clockwise labels with physical **Right side down** and **Left side down** choices.
+- Settings now save automatically, so a direction or placement change takes effect without finding a Save button.
+- Enabled native vertical touch panning in the settings window.
 
-## Before using it on a Hub
+## Redesigned
 
-- Requires Windows 10/11 Pro or Enterprise. Windows 10 Team is not supported.
-- This executable is unsigned. SmartScreen may warn and managed-device policy may block it.
-- Real Surface Hub reader-event support, placement, rotation direction, lock/sleep recovery, and launch at sign in are not yet hardware-verified.
-- Swivel rotates the desktop orientation. It does not physically motorize the display stand.
+- Compact Material-style settings with large touch targets and selectable chips instead of dropdowns.
+- Rounded cards, a dark custom window bezel, a cleaner rounded scrollbar, and Material-style switches.
+- Diagnostics are collapsed until requested, and secondary explanatory text is shorter.
+- The app continues running from its notification-area icon when the settings window is hidden or closed.
 
-## Download verification
+## Downloads
 
-`Swivel.exe` · Windows x64 · compact framework-dependent build
+- `Swivel.exe`: compact Windows x64 build; requires .NET 8 Desktop Runtime.
+- `Swivel-standalone.exe`: self-contained Windows x64 fallback.
 
-`Swivel-standalone.exe` · Windows x64 · self-contained build
-
-SHA-256 values are published as release assets alongside both executables.
+Both executables remain unsigned early prototypes. The corrected right-side-down mapping still needs confirmation on the Surface Hub 2S.

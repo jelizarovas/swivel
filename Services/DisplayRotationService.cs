@@ -95,11 +95,10 @@ internal sealed class DisplayRotationService
         }
 
         var currentlyLandscape = mode.dmPelsWidth >= mode.dmPelsHeight;
-        var target = currentlyLandscape
-            ? portraitTurn == PortraitTurn.Clockwise
-                ? NativeDisplayOrientation.Portrait270
-                : NativeDisplayOrientation.Portrait90
-            : NativeDisplayOrientation.Landscape;
+        // DEVMODE describes the counter-rotation Windows applies to the image.
+        // When the physical panel turns clockwise (right side down), Windows
+        // must use DMDO_90 so the desktop remains upright after the swivel.
+        var target = GetTargetOrientation(currentlyLandscape, portraitTurn);
 
         if ((mode.dmDisplayOrientation & 1) != ((uint)target & 1))
         {
@@ -147,6 +146,14 @@ internal sealed class DisplayRotationService
                 applied)
         };
     }
+
+    internal static NativeDisplayOrientation GetTargetOrientation(
+        bool currentlyLandscape,
+        PortraitTurn portraitTurn) => currentlyLandscape
+        ? portraitTurn == PortraitTurn.Clockwise
+            ? NativeDisplayOrientation.Portrait90
+            : NativeDisplayOrientation.Portrait270
+        : NativeDisplayOrientation.Landscape;
 
     private static DevMode GetCurrentMode()
     {

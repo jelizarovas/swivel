@@ -140,8 +140,8 @@ public partial class OverlayWindow : Window
         TargetText.Text = state.IsLandscape
             ? $"Switch to portrait · {_host.Settings.PortraitTurn switch
             {
-                PortraitTurn.Clockwise => "clockwise",
-                _ => "counter-clockwise"
+                PortraitTurn.Clockwise => "right side down",
+                _ => "left side down"
             }}"
             : "Switch back to landscape";
     }

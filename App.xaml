@@ -3,20 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0B0E14" />
-        <SolidColorBrush x:Key="CardBrush" Color="#151A24" />
-        <SolidColorBrush x:Key="CardHoverBrush" Color="#1C2330" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#2A3342" />
-        <SolidColorBrush x:Key="PrimaryBrush" Color="#6F8CFF" />
-        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#8BA1FF" />
-        <SolidColorBrush x:Key="TextBrush" Color="#F4F7FB" />
-        <SolidColorBrush x:Key="MutedTextBrush" Color="#9AA7BA" />
-        <SolidColorBrush x:Key="SuccessBrush" Color="#4DD4A8" />
-        <SolidColorBrush x:Key="WarningBrush" Color="#FFBE5C" />
-        <SolidColorBrush x:Key="ErrorBrush" Color="#FF6B7A" />
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0D1017" />
+        <SolidColorBrush x:Key="CardBrush" Color="#171B24" />
+        <SolidColorBrush x:Key="CardHoverBrush" Color="#202633" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#303746" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#91A7FF" />
+        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#AFC0FF" />
+        <SolidColorBrush x:Key="OnPrimaryBrush" Color="#16245C" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F1F3FA" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#A8AFBF" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#66DDB2" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#FFC66D" />
+        <SolidColorBrush x:Key="ErrorBrush" Color="#FF8691" />
 
         <Style TargetType="Window">
-            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
         </Style>
@@ -27,11 +28,12 @@
         </Style>
 
         <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="48" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="{StaticResource CardHoverBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="18,11" />
+            <Setter Property="Padding" Value="18,10" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -42,20 +44,20 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="10"
+                                CornerRadius="24"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#263043" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#293142" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.78" />
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.72" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.42" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -66,31 +68,92 @@
         <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-
-        <Style TargetType="ComboBox">
-            <Setter Property="MinHeight" Value="42" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="Background" Value="#F4F6FA" />
-            <Setter Property="Foreground" Value="#111827" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource OnPrimaryBrush}" />
         </Style>
 
         <Style TargetType="CheckBox">
+            <Setter Property="MinHeight" Value="48" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter VerticalAlignment="Center" />
+                            <Border x:Name="SwitchTrack"
+                                    Grid.Column="1"
+                                    Width="46"
+                                    Height="28"
+                                    Margin="16,0,2,0"
+                                    CornerRadius="14"
+                                    Background="#303746"
+                                    BorderBrush="#596277"
+                                    BorderThickness="1">
+                                <Ellipse x:Name="SwitchThumb"
+                                         Width="20"
+                                         Height="20"
+                                         Margin="3"
+                                         HorizontalAlignment="Left"
+                                         Fill="#C7CCD7" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="Background" Value="#91A7FF" />
+                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#91A7FF" />
+                                <Setter TargetName="SwitchThumb" Property="Fill" Value="#17224B" />
+                                <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.86" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Slider">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
         </Style>
 
         <Style x:Key="CardStyle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource CardBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="CornerRadius" Value="24" />
             <Setter Property="Padding" Value="20" />
-            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="2,0,0,8" />
+        </Style>
+
+        <Style x:Key="WindowControlButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth" Value="42" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="Normal" />
         </Style>
     </Application.Resources>
 </Application>

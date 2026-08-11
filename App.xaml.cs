@@ -105,7 +105,7 @@ public partial class App : System.Windows.Application
         _fingerprintMonitor.StatusChanged += OnFingerprintStatusChanged;
         _fingerprintMonitor.DiagnosticWarning += OnFingerprintDiagnosticWarning;
 
-        _logger.Info("Swivel 0.1.0 started.");
+        _logger.Info("Swivel 0.1.2 started.");
         _logger.Info($"Settings: {_settingsStore.SettingsPath}");
         _logger.Info($"Diagnostics: {_logger.LogPath}");
 
