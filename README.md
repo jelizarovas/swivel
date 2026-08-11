@@ -1,7 +1,7 @@
 # Swivel
 
 <p align="center">
-  <img src="docs/assets/illustrations/hero.webp" alt="A tiny technician pushing an enormous rotating screen" width="760">
+  <img src="docs/assets/animation/frame-touch.webp" alt="An isometric Surface Hub with the fingerprint reader on its right edge and the blue rotation bubble on screen" width="720">
 </p>
 
 [Website](https://jelizarovas.github.io/swivel/) · [Download the latest Windows build](https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe) · [Releases](https://github.com/jelizarovas/swivel/releases)
@@ -33,14 +33,15 @@ Swivel rotates the Windows desktop; it does **not** motorize the physical stand.
 
 The Hub must run Windows 10/11 Pro or Enterprise. The Surface Hub Fingerprint Reader is not supported on Windows 10 Team.
 
-1. [Download `Swivel.exe`](https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe) into a permanent local folder on the Hub, such as `Documents\Swivel`.
-2. Double-click the executable. It does not need a separate .NET installation.
-3. Confirm that the **Fingerprint reader** card says Swivel is listening.
-4. Touch the reader once and confirm the bubble appears.
-5. Use **Simulate fingerprint touch** if the reader is not available yet.
-6. Press **Rotate display** only when ready to test the Hub's real display orientation.
-7. If portrait turns the wrong way, change **How the panel turns into portrait**.
-8. Enable **Launch Swivel automatically when I sign in** only after the reader, rotation, lock/unlock, and sleep/resume checks pass.
+1. [Download the compact `Swivel.exe`](https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe) into a permanent local folder on the Hub, such as `Documents\Swivel`.
+2. Double-click it. The compact build is about 218 KB and uses the Microsoft .NET 8 Desktop Runtime. If that runtime is missing, Windows displays the required framework and an official download link; install it, then open Swivel again.
+3. If you prefer a larger file that carries its own runtime, download [`Swivel-standalone.exe`](https://github.com/jelizarovas/swivel/releases/latest/download/Swivel-standalone.exe) instead.
+4. Confirm that the **Fingerprint reader** card says Swivel is listening.
+5. Touch the reader once and confirm the bubble appears.
+6. Use **Simulate fingerprint touch** if the reader is not available yet.
+7. Press **Rotate display** only when ready to test the Hub's real display orientation.
+8. If portrait turns the wrong way, change **How the panel turns into portrait**.
+9. Enable **Launch Swivel automatically when I sign in** only after the reader, rotation, lock/unlock, and sleep/resume checks pass.
 
 The executable is currently unsigned, so Windows SmartScreen may show an unknown-publisher warning.
 
@@ -70,13 +71,19 @@ Development build:
 dotnet build .\Swivel.csproj -c Release
 ```
 
-Portable Windows x64 release:
+Compact Windows x64 release (requires .NET 8 Desktop Runtime):
+
+```powershell
+dotnet publish .\Swivel.csproj -p:PublishProfile=Compact
+```
+
+Standalone Windows x64 release:
 
 ```powershell
 dotnet publish .\Swivel.csproj -p:PublishProfile=Portable
 ```
 
-The publish profile produces a self-contained, single-file executable under `artifacts\Swivel-win-x64`.
+Both profiles produce single-file executables. `Compact` is about 218 KB and relies on the installed desktop runtime. `Portable` includes that runtime and is about 68 MiB.
 
 ## Current verification boundary
 

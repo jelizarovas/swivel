@@ -4,274 +4,61 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f1e8">
-  <meta name="description" content="Swivel gives a rotating Surface Hub 2S one simple orientation control.">
-  <meta property="og:title" content="Swivel — Turn the screen. Not your patience.">
-  <meta property="og:description" content="A tiny Windows helper for one very large rotating screen.">
+  <meta name="description" content="Swivel gives a rotating Surface Hub 2S one tiny orientation control.">
+  <meta property="og:title" content="Swivel — Touch. Tap. Swivel.">
+  <meta property="og:description" content="A 218 KB Windows helper for one very large rotating screen.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://jelizarovas.github.io/swivel/">
-  <meta property="og:image" content="https://jelizarovas.github.io/swivel/assets/illustrations/hero.webp">
-  <title>Swivel — A tiny rotation helper for Surface Hub</title>
+  <meta property="og:image" content="https://jelizarovas.github.io/swivel/assets/animation/frame-touch.webp">
+  <title>Swivel — Touch. Tap. Swivel.</title>
   <link rel="icon" href="assets/swivel-mark.svg" type="image/svg+xml">
-  <link rel="preload" href="assets/illustrations/hero.webp" as="image" type="image/webp">
+  <link rel="preload" href="assets/animation/frame-landscape.webp" as="image" type="image/webp">
   <link rel="stylesheet" href="styles.css">
-  <script src="script.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-
-  <header class="site-header" data-header>
-    <div class="shell nav-shell">
-      <a class="brand" href="#top" aria-label="Swivel home">
-        <img src="assets/swivel-mark.svg" width="34" height="34" alt="">
+  <main class="page-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="Swivel">
+        <img src="assets/swivel-mark.svg" width="38" height="38" alt="">
         <span>Swivel</span>
-      </a>
-
-      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
-        <span class="sr-only">Toggle navigation</span>
-        <span></span><span></span>
-      </button>
-
-      <nav class="nav-links" id="site-nav" aria-label="Main navigation" data-nav>
-        <a href="#why">Why</a>
-        <a href="#how">How it works</a>
-        <a href="#privacy">Privacy</a>
-        <a href="https://github.com/jelizarovas/swivel" target="_blank" rel="noreferrer">GitHub</a>
-        <a class="button button-small" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">Download</a>
-      </nav>
-    </div>
-  </header>
-
-  <main id="main">
-    <section class="hero section" id="top">
-      <div class="shell hero-grid">
-        <div class="hero-copy reveal">
-          <p class="eyebrow"><span class="status-dot"></span>A tiny helper for one very large screen</p>
-          <h1>Turn the screen.<br><em>Not your patience.</em></h1>
-          <p class="hero-lede">Swivel gives a Surface Hub 2S on a rotating stand one obvious orientation control. Touch the reader, tap the bubble, and turn Windows 90° without taking a guided tour of Settings.</p>
-
-          <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
-              Download Swivel
-            </a>
-            <a class="button button-quiet" href="#how">See how it works</a>
-          </div>
-
-          <ul class="quick-facts" aria-label="Download facts">
-            <li>Windows x64</li>
-            <li>Portable .exe</li>
-            <li>Public source</li>
-            <li>Early prototype</li>
-          </ul>
-
-          <p class="compatibility"><strong>Requires Windows 10/11 Pro or Enterprise.</strong> The original Windows 10 Team edition is not supported.</p>
-        </div>
-
-        <figure class="hero-art reveal" data-tilt>
-          <div class="art-glow"></div>
-          <img src="assets/illustrations/hero.webp" width="1440" height="960" alt="A tiny technician struggling to rotate an enormous screen while a maze of settings waits behind it.">
-          <figcaption class="float-note note-top">0 meetings required</figcaption>
-          <figcaption class="float-note note-bottom">Pixels only. No motors.</figcaption>
-        </figure>
       </div>
-    </section>
+      <div class="prototype-pill"><span></span>Early prototype</div>
+    </header>
 
-    <section class="section section-tight" id="why">
-      <div class="shell">
-        <div class="section-heading reveal">
-          <p class="eyebrow">Why it exists</p>
-          <h2>Born from a very specific annoyance.</h2>
-          <p>The stand rotates. The Windows desktop does not get the memo. The usual route involves Display Settings, a dropdown, a confirmation dialog, and enough ceremony to suggest the screen is applying for a passport.</p>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span>One enormous screen. One tiny button.</p>
+        <h1 id="hero-title">Touch.<br>Tap.<br><em>Swivel.</em></h1>
+        <p class="lede">Because walking across an 85-inch screen to find Display Settings technically counts as cardio.</p>
+
+        <div class="downloads" aria-label="Download choices">
+          <a class="download download-primary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">
+            <span>Download Swivel</span>
+            <small>218 KB</small>
+          </a>
+          <a class="download download-secondary" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel-standalone.exe">
+            <span>Standalone</span>
+            <small>68 MiB</small>
+          </a>
         </div>
 
-        <div class="reason-grid">
-          <article class="reason-card reveal">
-            <span class="reason-number">01</span>
-            <h3>The reader is already there</h3>
-            <p>Your hand naturally lands beside it. Swivel uses an available, unclaimed reader event as a simple trigger—never as identity.</p>
-          </article>
-          <article class="reason-card reveal">
-            <span class="reason-number">02</span>
-            <h3>The control should be obvious</h3>
-            <p>One large bubble. One rotate button. Ignore it and it disappears after two seconds, offended but professional.</p>
-          </article>
-          <article class="reason-card reason-card-accent reveal">
-            <span class="reason-number">03</span>
-            <h3>Important reality check</h3>
-            <p><strong>Swivel rotates the pixels. You rotate the furniture.</strong> The steel stand remains gloriously non-motorized.</p>
-          </article>
-        </div>
+        <p class="runtime-note"><strong>Try the tiny one first.</strong> If .NET 8 is missing, Windows shows the official install link. Standalone brings the runtime with it.</p>
+        <p class="fine-print">Windows 10/11 Pro or Enterprise · unsigned prototype · actual Hub reader support still needs a device test</p>
       </div>
-    </section>
 
-    <section class="section demo-section" aria-labelledby="demo-title">
-      <div class="shell demo-grid">
-        <div class="demo-copy reveal">
-          <p class="eyebrow">The not-quite-GIF</p>
-          <h2 id="demo-title">Boop. Bubble. Turn.</h2>
-          <p>A tiny web animation weighs less, stays crisp, and politely stops moving when your device asks for reduced motion. GIFs walked so this rectangle could rotate.</p>
-          <div class="demo-sequence" aria-label="Touch the reader, use the bubble, then rotate the screen">
-            <span>01 · touch</span><span>02 · tap</span><span>03 · swivel</span>
-          </div>
+      <figure class="demo" aria-label="A looping isometric demonstration: touch the fingerprint reader, tap the blue button on screen, then rotate the Surface Hub into portrait orientation.">
+        <div class="frame-stack">
+          <img class="frame frame-landscape" src="assets/animation/frame-landscape.webp" width="960" height="960" alt="" aria-hidden="true">
+          <img class="frame frame-touch" src="assets/animation/frame-touch.webp" width="960" height="960" alt="" aria-hidden="true">
+          <img class="frame frame-click" src="assets/animation/frame-click.webp" width="960" height="960" alt="" aria-hidden="true">
+          <img class="frame frame-portrait" src="assets/animation/frame-portrait.webp" width="960" height="960" alt="" aria-hidden="true">
         </div>
-
-        <div class="demo-stage reveal" aria-hidden="true">
-          <div class="demo-floor"></div>
-          <div class="demo-stand">
-            <span class="demo-leg leg-one"></span>
-            <span class="demo-leg leg-two"></span>
-            <span class="demo-leg leg-three"></span>
-            <span class="demo-leg leg-four"></span>
-            <span class="demo-shelf"></span>
-          </div>
-          <div class="demo-screen">
-            <div class="demo-window"><i></i><i></i><i></i></div>
-            <span class="demo-sensor"></span>
-            <div class="demo-bubble">
-              <svg viewBox="0 0 48 48"><path d="M34 15a14 14 0 1 0 3.5 14M34 9v9h-9"/></svg>
-            </div>
-          </div>
-          <div class="demo-finger"><span></span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="how">
-      <div class="shell">
-        <div class="section-heading reveal">
-          <p class="eyebrow">How it works</p>
-          <h2>Four steps. One fewer tiny frustration.</h2>
-          <p>Start with the simulated control. Save the giant-screen gymnastics for when you are ready.</p>
-        </div>
-
-        <ol class="steps">
-          <li class="step reveal">
-            <div class="step-art"><img src="assets/illustrations/step-download.webp" width="1080" height="720" loading="lazy" alt="The Swivel technician carries a small downloaded app parcel toward the giant screen."></div>
-            <div class="step-copy">
-              <span class="step-index">Step 01</span>
-              <h3>Put Swivel on the Hub</h3>
-              <p>Open this page on the Hub, download <code>Swivel.exe</code>, place it in a permanent local folder, and launch it. There is no installer and no separate .NET setup.</p>
-              <p class="aside">A 68 MB “tiny utility.” Self-contained software has an appetite.</p>
-            </div>
-          </li>
-
-          <li class="step step-reverse reveal">
-            <div class="step-art"><img src="assets/illustrations/step-touch.webp" width="1080" height="720" loading="lazy" alt="The technician touches the reader and a blue rotation bubble appears beside the screen."></div>
-            <div class="step-copy">
-              <span class="step-index">Step 02</span>
-              <h3>Boop the reader</h3>
-              <p>Confirm the control panel says the fingerprint listener is ready. Touch the reader once and the bubble appears. If the hardware is not ready, choose <strong>Simulate fingerprint touch</strong>.</p>
-              <p class="aside">No fingerprint image. No identity. Just a very fancy button signal.</p>
-            </div>
-          </li>
-
-          <li class="step reveal">
-            <div class="step-art"><img src="assets/illustrations/step-rotate.webp" width="1080" height="720" loading="lazy" alt="The technician taps the rotation control while manually pushing the screen into portrait orientation."></div>
-            <div class="step-copy">
-              <span class="step-index">Step 03</span>
-              <h3>Tap, then physically swivel</h3>
-              <p>Tap <strong>Rotate display</strong>. Swivel asks Windows to turn the desktop 90°. You then rotate the physical Hub on its stand like the capable human motor you are.</p>
-              <p class="aside">If it turns the wrong way, no panic—change the portrait direction in Settings.</p>
-            </div>
-          </li>
-
-          <li class="step step-reverse reveal">
-            <div class="step-art"><img src="assets/illustrations/step-settings.webp" width="1080" height="720" loading="lazy" alt="The relaxed technician sits beside controls for timeout, direction, and bubble position."></div>
-            <div class="step-copy">
-              <span class="step-index">Step 04</span>
-              <h3>Tune it once. Forget it exists.</h3>
-              <p>Choose the bubble position for landscape and portrait, adjust its timeout and turn direction, and enable launch at sign-in only after the Hub tests pass.</p>
-              <p class="aside">The highest compliment for a utility is forgetting it is running.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="section download-section" id="download">
-      <div class="shell download-card reveal">
-        <div class="download-copy">
-          <p class="eyebrow eyebrow-light">Current release</p>
-          <h2>Make the giant screen slightly less dramatic.</h2>
-          <p>Download directly on the Surface Hub, place the file somewhere permanent, and try the simulated control before touching the real display orientation.</p>
-          <div class="download-actions">
-            <a class="button button-light" href="https://github.com/jelizarovas/swivel/releases/latest/download/Swivel.exe">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
-              Download Swivel.exe
-            </a>
-            <a class="button button-outline-light" href="https://github.com/jelizarovas/swivel" target="_blank" rel="noreferrer">View source</a>
-          </div>
-        </div>
-
-        <dl class="release-facts">
-          <div><dt>Version</dt><dd>0.1.0</dd></div>
-          <div><dt>Platform</dt><dd>Windows x64</dd></div>
-          <div><dt>Size</dt><dd>68.31 MiB</dd></div>
-          <div><dt>Publisher</dt><dd>Unsigned prototype</dd></div>
-          <div class="checksum-row">
-            <dt>SHA-256</dt>
-            <dd><code data-checksum>4449DC99CB2DC0803E342A3C3708417099DFE8EB8D2BA3293FADEEBDA026131A</code></dd>
-            <button class="copy-button" type="button" data-copy-checksum>Copy</button>
-          </div>
-        </dl>
-      </div>
-    </section>
-
-    <section class="section" id="privacy">
-      <div class="shell trust-grid">
-        <div class="section-heading reveal">
-          <p class="eyebrow">Privacy</p>
-          <h2>It needs a signal.<br>Not your fingerprint.</h2>
-          <p>Swivel does not receive or store a fingerprint image, biometric identity, or biometric template. There is no account, cloud service, analytics, or telemetry.</p>
-        </div>
-
-        <div class="trust-cards">
-          <article class="trust-card reveal">
-            <span class="trust-icon">◎</span>
-            <h3>Local only</h3>
-            <p>Settings and diagnostics stay on the device under your local Swivel app-data folder.</p>
-          </article>
-          <article class="trust-card reveal">
-            <span class="trust-icon">◇</span>
-            <h3>No biometric data</h3>
-            <p>It listens for an unused reader event. It does not ask Windows to identify the person touching it.</p>
-          </article>
-          <article class="trust-card reveal">
-            <span class="trust-icon">↗</span>
-            <h3>Public source</h3>
-            <p>The code is visible on GitHub. No open-source license has been selected yet.</p>
-          </article>
-        </div>
-
-        <aside class="prototype-note reveal">
-          <div>
-            <span class="warning-pill">Prototype reality</span>
-            <h3>Please read this bit. It is less funny.</h3>
-          </div>
-          <ul>
-            <li>The app is unsigned, so SmartScreen may warn and managed-device policy may block it.</li>
-            <li>Real Surface Hub reader events, placement, sleep/lock behavior, and rotation direction still need device verification.</li>
-            <li>Some fingerprint drivers do not expose the background event Swivel needs.</li>
-            <li>Diagnostic logs can include your local Windows profile path. Redact paths before posting a log publicly.</li>
-          </ul>
-        </aside>
-      </div>
+        <figcaption>
+          <span class="loop-dot"></span>
+          Touch reader <b>→</b> tap bubble <b>→</b> swivel
+        </figcaption>
+      </figure>
     </section>
   </main>
-
-  <footer class="site-footer">
-    <div class="shell footer-grid">
-      <div>
-        <a class="brand brand-footer" href="#top"><img src="assets/swivel-mark.svg" width="30" height="30" alt=""><span>Swivel</span></a>
-        <p>Made because Display Settings is a very long walk on a very large screen.</p>
-      </div>
-      <div class="footer-links">
-        <a href="https://github.com/jelizarovas/swivel">GitHub</a>
-        <a href="https://github.com/jelizarovas/swivel/releases">Releases</a>
-        <a href="#privacy">Privacy</a>
-      </div>
-      <p class="legal">Swivel is an independent prototype and is not affiliated with or endorsed by Microsoft. © <span data-year></span>.</p>
-    </div>
-  </footer>
 </body>
 </html>

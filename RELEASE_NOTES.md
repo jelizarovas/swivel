@@ -1,9 +1,13 @@
-# Swivel v0.1.0
+# Swivel v0.1.1
 
-The first public prototype of Swivel: a small Windows utility for rotating a Surface Hub 2S without taking a field trip through Display Settings.
+The tiny-build and tiny-website release of Swivel.
 
 ## Included
 
+- A compact single-file Windows build of about 218 KB. If .NET 8 Desktop Runtime is missing, Windows shows the required framework and official download link.
+- A self-contained fallback build that carries the desktop runtime with it.
+- A one-viewport website with no navigation or scrolling.
+- A four-frame isometric animation: touch the reader, reveal the on-screen bubble, click it, then swivel to portrait.
 - One unused fingerprint-reader event toggles the rotation bubble.
 - The bubble disappears after two untouched seconds by default.
 - Landscape and portrait bubble positions are configurable.
@@ -21,10 +25,8 @@ The first public prototype of Swivel: a small Windows utility for rotating a Sur
 
 ## Download verification
 
-`Swivel.exe` · Windows x64 · 68.31 MiB
+`Swivel.exe` · Windows x64 · compact framework-dependent build
 
-SHA-256:
+`Swivel-standalone.exe` · Windows x64 · self-contained build
 
-```text
-4449DC99CB2DC0803E342A3C3708417099DFE8EB8D2BA3293FADEEBDA026131A
-```
+SHA-256 values are published as release assets alongside both executables.
