@@ -12,4 +12,4 @@ The quieter demo and multi-monitor release.
 - Simplified Monitor mode to one tray-icon click per rotation with no secondary on-screen button.
 - Simplified the landing-page copy, added the GitHub repository link, and changed Compatibility, How it runs, Privacy, and Terms to underlined modal links.
 
-Both executables remain unsigned. Real fingerprint-reader support and corrected rotation direction still need confirmation on the Surface Hub 2S.
+Both executables remain unsigned. Real fingerprint-reader support and corrected rotation direction still need confirmation on the target device.

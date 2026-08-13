@@ -1,5 +1,11 @@
 const PAYPAL_URL = "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=arnas.jelizarovas%40gmail.com&item_name=Swivel+development&currency_code=USD";
 
+const MODES = [
+  ["stand", "Stand"],
+  ["wall", "Wall mounted"],
+  ["monitor", "Monitor"],
+];
+
 function GitHubIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -18,7 +24,12 @@ export function Header() {
         <span>Swivel</span>
       </a>
 
-      <nav className="topbar-links flex items-center" aria-label="Project links">
+      <nav className="topbar-links flex items-center" aria-label="Demo controls and project links">
+        <div className="demo-tabs" role="tablist" aria-label="Choose a display setup">
+          {MODES.map(([mode, label], index) => (
+            <button type="button" role="tab" aria-selected={index === 0} data-demo-mode={mode} key={mode}>{label}</button>
+          ))}
+        </div>
         <a className="github-link" href="https://github.com/jelizarovas/swivel" target="_blank" rel="noreferrer">
           <GitHubIcon />
           <span>jelizarovas/swivel</span>

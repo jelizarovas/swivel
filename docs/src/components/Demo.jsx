@@ -1,12 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const MODES = [
-  ["stand", "Stand"],
-  ["wall", "Wall mounted"],
-  ["monitor", "Monitor"],
-];
-
-export function Demo() {
+export function Demo({ header }) {
   const demoRef = useRef(null);
 
   useEffect(() => {
@@ -36,11 +30,7 @@ export function Demo() {
       aria-label="An interactive 3D Swivel demonstration."
       ref={demoRef}
     >
-      <div className="demo-tabs" role="tablist" aria-label="Choose a display setup">
-        {MODES.map(([mode, label], index) => (
-          <button type="button" role="tab" aria-selected={index === 0} data-demo-mode={mode} key={mode}>{label}</button>
-        ))}
-      </div>
+      {header}
       <img className="webgl-fallback" src={`${base}assets/animation/frame-landscape.webp`} width="960" height="960" alt="" aria-hidden="true" />
       <canvas id="swivel-scene" aria-hidden="true" />
       <svg className="drag-force-vector" aria-hidden="true">

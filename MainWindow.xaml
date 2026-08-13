@@ -150,7 +150,7 @@
                 </Border>
                 <StackPanel>
                     <TextBlock Text="Swivel" FontSize="26" FontWeight="SemiBold" />
-                    <TextBlock Text="Surface Hub rotation" Foreground="{StaticResource MutedTextBrush}" FontSize="13" />
+                    <TextBlock Text="Display rotation" Foreground="{StaticResource MutedTextBrush}" FontSize="13" />
                 </StackPanel>
             </StackPanel>
             <Border Grid.Column="1" Background="#20283A" CornerRadius="16" Padding="12,7" VerticalAlignment="Center">

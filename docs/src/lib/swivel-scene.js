@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createInteractiveDesktopTexture } from "./interactive-desktop";
 
 export async function mountSwivelScene(root = document) {
 const demo = root.matches?.(".demo") ? root : root.querySelector(".demo");
@@ -17,6 +18,7 @@ let renderer = null;
 let observer = null;
 let animationFrame = 0;
 let disposed = false;
+let disposeUi = null;
 const scheduleFrame = (callback) => {
   if (!disposed) animationFrame = requestAnimationFrame(callback);
 };
@@ -112,91 +114,6 @@ function tubeAlong(points, radius, meshMaterial, tubularSegments = 28) {
   return mesh;
 }
 
-function createUiTexture() {
-  const uiCanvas = document.createElement("canvas");
-  uiCanvas.width = 1024;
-  uiCanvas.height = 576;
-  const context = uiCanvas.getContext("2d");
-  const texture = new THREE.CanvasTexture(uiCanvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  let lastAngle = Number.NaN;
-  let lastMode = "";
-
-  const roundRect = (x, y, width, height, radius, fill) => {
-    context.beginPath();
-    context.roundRect(x, y, width, height, radius);
-    context.fillStyle = fill;
-    context.fill();
-  };
-
-  const draw = (angle, mode = "stand") => {
-    if (Math.abs(angle - lastAngle) < 0.002 && mode === lastMode) return;
-    lastAngle = angle;
-    lastMode = mode;
-    const width = uiCanvas.width;
-    const height = uiCanvas.height;
-    const background = context.createLinearGradient(0, 0, width, height);
-    background.addColorStop(0, "#101b37");
-    background.addColorStop(0.5, "#183c65");
-    background.addColorStop(1, "#0f736f");
-    context.fillStyle = background;
-    context.fillRect(0, 0, width, height);
-
-    context.save();
-    context.translate(width / 2, height / 2);
-    context.rotate(angle);
-    const scale = mix(1, 0.64, Math.abs(Math.sin(angle)));
-    context.scale(scale, scale);
-    context.translate(-width / 2, -height / 2);
-
-    roundRect(70, 68, 525, 390, 34, "rgba(112,138,255,.88)");
-    roundRect(635, 68, 295, 116, 28, "rgba(247,244,252,.82)");
-    roundRect(635, 207, 295, 251, 28, "rgba(245,189,124,.82)");
-    roundRect(104, 105, 190, 20, 10, "rgba(255,255,255,.68)");
-    roundRect(104, 145, 340, 13, 7, "rgba(255,255,255,.32)");
-    roundRect(104, 174, 290, 13, 7, "rgba(255,255,255,.25)");
-    roundRect(104, 344, 145, 60, 20, "rgba(255,255,255,.26)");
-    roundRect(273, 344, 145, 60, 20, "rgba(255,255,255,.18)");
-
-    if (mode === "monitor") {
-      roundRect(0, height - 54, width, 54, 0, "rgba(11,18,34,.88)");
-      roundRect(width - 58, height - 46, 38, 38, 10, "#5f74ed");
-      context.save();
-      context.translate(width - 39, height - 27);
-      context.strokeStyle = "white";
-      context.lineWidth = 4;
-      context.lineCap = "round";
-      context.lineJoin = "round";
-      context.beginPath();
-      context.moveTo(-9, 7);
-      context.bezierCurveTo(0, 10, 9, 2, 8, -8);
-      context.moveTo(-9, 7);
-      context.lineTo(-4, 1);
-      context.moveTo(-9, 7);
-      context.lineTo(-2, 10);
-      context.moveTo(8, -8);
-      context.lineTo(2, -3);
-      context.moveTo(8, -8);
-      context.lineTo(12, -2);
-      context.stroke();
-      context.restore();
-    }
-    context.restore();
-
-    const shine = context.createLinearGradient(0, 0, width, height);
-    shine.addColorStop(0, "rgba(255,255,255,.24)");
-    shine.addColorStop(0.27, "rgba(255,255,255,0)");
-    shine.addColorStop(1, "rgba(255,255,255,.05)");
-    context.fillStyle = shine;
-    context.fillRect(0, 0, width, height);
-    texture.needsUpdate = true;
-  };
-
-  draw(0);
-  return { texture, draw };
-}
-
 function createLabelTexture(label) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -216,6 +133,33 @@ function createLabelTexture(label) {
   return texture;
 }
 
+function createLensFlareTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  const halo = context.createRadialGradient(256, 128, 0, 256, 128, 116);
+  halo.addColorStop(0, "rgba(238,247,255,.98)");
+  halo.addColorStop(0.08, "rgba(169,207,255,.78)");
+  halo.addColorStop(0.3, "rgba(92,145,255,.24)");
+  halo.addColorStop(1, "rgba(70,112,255,0)");
+  context.fillStyle = halo;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const streak = context.createLinearGradient(0, 0, canvas.width, 0);
+  streak.addColorStop(0, "rgba(106,154,255,0)");
+  streak.addColorStop(0.38, "rgba(157,200,255,.06)");
+  streak.addColorStop(0.5, "rgba(232,246,255,.54)");
+  streak.addColorStop(0.62, "rgba(157,200,255,.06)");
+  streak.addColorStop(1, "rgba(106,154,255,0)");
+  context.fillStyle = streak;
+  context.fillRect(0, 124, canvas.width, 8);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 try {
   renderer = new THREE.WebGLRenderer({
     canvas,
@@ -226,7 +170,7 @@ try {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
+  renderer.toneMappingExposure = 0.94;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -235,26 +179,48 @@ try {
   camera.position.set(7.2, 5.4, 11.5);
   camera.lookAt(0, 0.25, 0);
 
-  scene.add(new THREE.HemisphereLight(0xfff7eb, 0x858893, 2.15));
-  const key = new THREE.DirectionalLight(0xfff1df, 4.2);
-  key.position.set(-4.5, 9, 8);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.left = -8;
-  key.shadow.camera.right = 8;
-  key.shadow.camera.top = 9;
-  key.shadow.camera.bottom = -7;
-  scene.add(key);
-  const rim = new THREE.DirectionalLight(0xdce5ff, 2.15);
-  rim.position.set(7, 3, -5);
-  scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0x263249, 0x06070b, 0.72));
+
+  const pendantLightTarget = new THREE.Object3D();
+  pendantLightTarget.position.set(0, 0.15, 0);
+  scene.add(pendantLightTarget);
+  const pendantLight = new THREE.SpotLight(0xffb76e, 92, 22, Math.PI / 3.35, 0.56, 1.55);
+  pendantLight.target = pendantLightTarget;
+  pendantLight.castShadow = true;
+  pendantLight.shadow.mapSize.set(
+    window.matchMedia("(max-width: 860px)").matches ? 512 : 1024,
+    window.matchMedia("(max-width: 860px)").matches ? 512 : 1024
+  );
+  pendantLight.shadow.camera.near = 0.5;
+  pendantLight.shadow.camera.far = 22;
+  pendantLight.shadow.bias = -0.00035;
+  pendantLight.shadow.normalBias = 0.025;
+  pendantLight.shadow.radius = 3;
+  scene.add(pendantLight);
+
+  const studioLightTarget = new THREE.Object3D();
+  studioLightTarget.position.set(0, 0.7, 0.1);
+  scene.add(studioLightTarget);
+  const studioLight = new THREE.SpotLight(0xc9ddff, 108, 25, Math.PI / 4.2, 0.48, 1.7);
+  studioLight.position.set(1.45, -2.39, -3.9);
+  studioLight.target = studioLightTarget;
+  studioLight.castShadow = true;
+  studioLight.shadow.mapSize.set(512, 512);
+  studioLight.shadow.camera.near = 0.45;
+  studioLight.shadow.camera.far = 22;
+  studioLight.shadow.bias = -0.00025;
+  studioLight.shadow.normalBias = 0.022;
+  studioLight.shadow.radius = 2.5;
+  scene.add(studioLight);
 
   const sceneRig = new THREE.Group();
   scene.add(sceneRig);
+  scene.remove(studioLight, studioLightTarget);
+  sceneRig.add(studioLight, studioLightTarget);
 
   const stage = new THREE.Mesh(
     new THREE.CylinderGeometry(4.55, 4.8, 0.34, 64),
-    material(0xc9c1d7, 0.82)
+    material(0x222433, 0.76)
   );
   stage.position.y = -2.83;
   stage.receiveShadow = true;
@@ -269,42 +235,252 @@ try {
   const shelfMaterial = material(0x74777d, 0.9, 0.01);
   const cableDark = material(0x343941, 0.72, 0.02);
   const cableLight = material(0xd9dcde, 0.55, 0.04);
-  const logoMaterial = material(0xcfd2d2, 0.62, 0.02);
   const frameMaterial = material(0x11141b, 0.24, 0.5);
-  const wallMaterial = material(0xe9e2d9, 0.88, 0.02);
+  const wallMaterial = material(0x171b25, 0.88, 0.02);
+  const studioBlack = material(0x171922, 0.38, 0.18);
+  const studioMetal = material(0x343b49, 0.3, 0.42);
+  const warmShadeInner = new THREE.MeshStandardMaterial({
+    color: 0xffd5a1,
+    emissive: 0xff9e4d,
+    emissiveIntensity: 0.65,
+    roughness: 0.52,
+    side: THREE.BackSide
+  });
+  const warmBulbMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffdbad,
+    emissive: 0xffa34f,
+    emissiveIntensity: 4.2,
+    roughness: 0.16
+  });
+  const pendantAnchor = new THREE.Vector3(-4.45, 8.55, 3.2);
+  const pendantLength = 5.18;
+  const pendantRestDirection = new THREE.Vector3(0.052, -0.997, 0.054).normalize();
+  const pendantDirection = pendantRestDirection.clone();
+  const pendantOmega = new THREE.Vector3();
+  const pendantGroup = new THREE.Group();
+  scene.add(pendantGroup);
+
+  const pendantCeiling = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.25, 0.31, 0.22, 28),
+    studioBlack
+  );
+  pendantCeiling.position.copy(pendantAnchor).add(new THREE.Vector3(0, 0.08, 0));
+  pendantCeiling.castShadow = true;
+  scene.add(pendantCeiling);
+
+  const pendantCord = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), studioBlack);
+  pendantCord.castShadow = true;
+  scene.add(pendantCord);
+  const pendantCordHit = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 1, 10),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+  );
+  pendantCordHit.userData.action = "pendulum";
+  pendantCordHit.userData.part = "cord";
+  scene.add(pendantCordHit);
+
+  const pendantShade = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.17, 0.52, 0.55, 32, 1, true),
+    studioBlack
+  );
+  pendantShade.position.y = 0.25;
+  pendantShade.castShadow = true;
+  pendantGroup.add(pendantShade);
+  const pendantShadeInner = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.145, 0.485, 0.52, 32, 1, true),
+    warmShadeInner
+  );
+  pendantShadeInner.position.y = 0.245;
+  pendantGroup.add(pendantShadeInner);
+  const pendantSocket = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.24, 24), studioMetal);
+  pendantSocket.position.y = 0.47;
+  pendantSocket.castShadow = true;
+  pendantGroup.add(pendantSocket);
+  const pendantBulb = new THREE.Mesh(new THREE.SphereGeometry(0.23, 28, 20), warmBulbMaterial);
+  pendantBulb.position.y = -0.34;
+  pendantGroup.add(pendantBulb);
+  const pendantGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.31, 24, 16),
+    new THREE.MeshBasicMaterial({
+      color: 0xffb25e,
+      transparent: true,
+      opacity: 0.16,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  pendantGlow.position.y = -0.34;
+  pendantGroup.add(pendantGlow);
+  const pendantFill = new THREE.PointLight(0xffa85b, 19, 5.5, 2);
+  pendantFill.position.y = -0.34;
+  pendantGroup.add(pendantFill);
+  const pendantRim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.49, 0.035, 12, 36),
+    new THREE.MeshStandardMaterial({
+      color: 0x6f5136,
+      emissive: 0xff9f50,
+      emissiveIntensity: 0.85,
+      roughness: 0.34
+    })
+  );
+  pendantRim.rotation.x = Math.PI / 2;
+  pendantRim.position.y = -0.025;
+  pendantGroup.add(pendantRim);
+  const pendantBulbHit = new THREE.Mesh(
+    new THREE.SphereGeometry(0.58, 20, 14),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+  );
+  pendantBulbHit.position.y = -0.34;
+  pendantBulbHit.userData.action = "pendulum";
+  pendantBulbHit.userData.part = "bulb";
+  pendantGroup.add(pendantBulbHit);
+
+  studioLight.intensity = 58;
+  studioLight.distance = 15;
+  studioLight.angle = Math.PI / 3;
+  studioLight.penumbra = 0.76;
+  studioLightTarget.position.set(0, 0.55, -0.05);
+
+  const floorLightLevels = {
+    spotlight: 58,
+    fill: 6,
+    glassEmissive: 1.35,
+    coreEmissive: 4.8,
+    flareOpacity: 0.12
+  };
+  let floorLightLevel = 1;
+  let floorLightTarget = 1;
+  demo.dataset.floorLight = "on";
+  const floorBulbGroup = new THREE.Group();
+  studioLight.position.set(1.45, -2.39, -3.9);
+  floorBulbGroup.position.copy(studioLight.position);
+  floorBulbGroup.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(-0.78, 0.06, 0.62).normalize()
+  );
+  const floorBulbProfile = [
+    [0.1, -0.3], [0.15, -0.24], [0.17, -0.15], [0.27, -0.03],
+    [0.31, 0.12], [0.29, 0.25], [0.21, 0.36], [0.08, 0.43], [0, 0.45]
+  ].map(([radius, y]) => new THREE.Vector2(radius, y));
+  const floorBulbGlassMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xdceaff,
+      emissive: 0x77aaff,
+      emissiveIntensity: floorLightLevels.glassEmissive,
+      roughness: 0.12,
+      transmission: 0.35,
+      thickness: 0.12,
+      transparent: true,
+      opacity: 0.68,
+      depthWrite: false
+    });
+  const floorBulbGlass = new THREE.Mesh(
+    new THREE.LatheGeometry(floorBulbProfile, 32),
+    floorBulbGlassMaterial
+  );
+  floorBulbGroup.add(floorBulbGlass);
+  const floorBulbCoreMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf2f8ff,
+    emissive: 0x8ebcff,
+    emissiveIntensity: floorLightLevels.coreEmissive,
+    roughness: 0.1
+  });
+  const floorBulbCore = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.09, 0.12, 6, 16),
+    floorBulbCoreMaterial
+  );
+  floorBulbCore.position.y = 0.08;
+  floorBulbGroup.add(floorBulbCore);
+  const floorBulbSocket = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.17, 0.28, 24),
+    studioMetal
+  );
+  floorBulbSocket.position.y = -0.42;
+  floorBulbSocket.castShadow = true;
+  floorBulbGroup.add(floorBulbSocket);
+  for (const y of [-0.35, -0.42, -0.49]) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(0.166, 0.012, 8, 24), studioMetal);
+    rib.rotation.x = Math.PI / 2;
+    rib.position.y = y;
+    floorBulbGroup.add(rib);
+  }
+  const floorBulbFill = new THREE.PointLight(0x8ebdff, 6, 3.5, 2);
+  floorBulbFill.position.y = 0.08;
+  floorBulbGroup.add(floorBulbFill);
+  const floorBulbHit = new THREE.Mesh(
+    new THREE.SphereGeometry(0.58, 18, 12),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+  );
+  floorBulbHit.position.y = 0.02;
+  floorBulbHit.userData.action = "floor-light";
+  floorBulbGroup.add(floorBulbHit);
+  sceneRig.add(floorBulbGroup);
+
+  const floorSocketPosition = new THREE.Vector3(0, -0.57, 0)
+    .applyQuaternion(floorBulbGroup.quaternion)
+    .add(floorBulbGroup.position);
+  const floorCable = tubeAlong([
+    floorSocketPosition,
+    new THREE.Vector3(1.95, -2.58, -3.56),
+    new THREE.Vector3(2.55, -2.61, -3.05),
+    new THREE.Vector3(3.08, -2.61, -2.45),
+    new THREE.Vector3(2.72, -2.61, -1.9),
+    new THREE.Vector3(2.02, -2.61, -2.06),
+    new THREE.Vector3(1.72, -2.61, -2.82),
+    new THREE.Vector3(2.38, -2.61, -3.42),
+    new THREE.Vector3(3.28, -2.6, -3.2),
+    new THREE.Vector3(4.05, -2.58, -2.35)
+  ], 0.03, studioBlack, 70);
+  sceneRig.add(floorCable);
+
+  const flareTexture = createLensFlareTexture();
+  const floorBulbFlareMaterial = new THREE.SpriteMaterial({
+    map: flareTexture,
+    color: 0xbcd8ff,
+    transparent: true,
+    opacity: floorLightLevels.flareOpacity,
+    blending: THREE.AdditiveBlending,
+    depthTest: true,
+    depthWrite: false,
+    toneMapped: false
+  });
+  const floorBulbFlare = new THREE.Sprite(floorBulbFlareMaterial);
+  floorBulbFlare.scale.set(1.75, 0.88, 1);
+  floorBulbFlare.renderOrder = 5;
+  floorBulbFlare.position.copy(studioLight.position);
+  sceneRig.add(floorBulbFlare);
 
   const stand = new THREE.Group();
   const legSpecs = [
-    [new THREE.Vector3(-1.68, 1.68, 0.12), new THREE.Vector3(-2.4, -2.36, 0.78)],
-    [new THREE.Vector3(1.68, 1.68, 0.12), new THREE.Vector3(2.4, -2.36, 0.78)],
-    [new THREE.Vector3(-1.58, 1.58, -0.3), new THREE.Vector3(-1.82, -2.36, -0.88)],
-    [new THREE.Vector3(1.58, 1.58, -0.3), new THREE.Vector3(1.82, -2.36, -0.88)]
+    [new THREE.Vector3(-1.48, 1.68, 0.12), new THREE.Vector3(-2.12, -2.36, 0.68)],
+    [new THREE.Vector3(1.48, 1.68, 0.12), new THREE.Vector3(2.12, -2.36, 0.68)],
+    [new THREE.Vector3(-1.4, 1.58, -0.3), new THREE.Vector3(-1.62, -2.36, -0.72)],
+    [new THREE.Vector3(1.4, 1.58, -0.3), new THREE.Vector3(1.62, -2.36, -0.72)]
   ];
   for (const [top, bottom] of legSpecs) {
-    stand.add(cylinderBetween(top, bottom, 0.092, whiteMetal, 24));
+    stand.add(cylinderBetween(top, bottom, 0.075, whiteMetal, 24));
   }
 
   for (const z of [-0.48, 0.48]) {
     stand.add(cylinderBetween(
-      new THREE.Vector3(-1.93, -1.18, z),
-      new THREE.Vector3(1.93, -1.18, z),
+      new THREE.Vector3(-1.68, -1.18, z),
+      new THREE.Vector3(1.68, -1.18, z),
       0.062,
       whiteMetal,
       20));
   }
 
-  const shelfShell = new THREE.Mesh(roundedSolid(3.92, 1.04, 0.36, 0.24, 0.045), whitePlastic);
+  const shelfShell = new THREE.Mesh(roundedSolid(3.45, 1.04, 0.36, 0.24, 0.045), whitePlastic);
   shelfShell.rotation.x = -Math.PI / 2;
   shelfShell.position.set(0, -1.12, 0.02);
   shelfShell.castShadow = true;
   stand.add(shelfShell);
-  const shelfTop = new THREE.Mesh(roundedSolid(3.7, 0.84, 0.29, 0.045, 0.018), shelfMaterial);
+  const shelfTop = new THREE.Mesh(roundedSolid(3.25, 0.84, 0.29, 0.045, 0.018), shelfMaterial);
   shelfTop.rotation.x = -Math.PI / 2;
   shelfTop.position.set(0, -0.975, 0.02);
   shelfTop.castShadow = true;
   stand.add(shelfTop);
 
-  for (const x of [-1.64, 1.64]) {
+  for (const x of [-1.44, 1.44]) {
     const hinge = new THREE.Group();
     hinge.position.set(x, 1.6, -0.03);
     const hingeBody = new THREE.Mesh(roundedSolid(0.34, 0.46, 0.14, 0.34, 0.035), whitePlastic);
@@ -319,10 +495,10 @@ try {
   }
 
   const wheelSpecs = [
-    [-2.4, -2.42, 0.78, -0.2],
-    [2.4, -2.42, 0.78, 0.18],
-    [-1.82, -2.42, -0.88, 0.24],
-    [1.82, -2.42, -0.88, -0.16]
+    [-2.12, -2.42, 0.68, -0.2],
+    [2.12, -2.42, 0.68, 0.18],
+    [-1.62, -2.42, -0.72, 0.24],
+    [1.62, -2.42, -0.72, -0.16]
   ];
   for (const [x, y, z, yaw] of wheelSpecs) {
     const wheel = new THREE.Group();
@@ -382,14 +558,7 @@ try {
   mountFace.position.z = -0.09;
   mountFace.castShadow = true;
   mountAssembly.add(mountFace);
-  for (const x of [-0.092, 0.092]) {
-    for (const y of [-0.092, 0.092]) {
-      const logoTile = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.018), logoMaterial);
-      logoTile.position.set(x, y, -0.135);
-      mountAssembly.add(logoTile);
-    }
-  }
-  for (const x of [-1.53, 1.53]) {
+  for (const x of [-1.34, 1.34]) {
     stand.add(cylinderBetween(
       new THREE.Vector3(x, 1.56, 0.02),
       new THREE.Vector3(x * 0.92, 1.56, 0.31),
@@ -481,7 +650,7 @@ try {
   // Pitch the panel back around its horizontal axis. The camera supplies the
   // isometric side view; the screen itself stays square to its physical mount.
   const displayMount = new THREE.Group();
-  displayMount.position.set(0, 1.55, 0.82);
+  displayMount.position.set(0, 1.75, 0.82);
   displayMount.rotation.x = -0.14;
   sceneRig.add(displayMount);
 
@@ -489,39 +658,68 @@ try {
   displayMount.add(display);
   display.add(mountAssembly);
 
-  const chassis = new THREE.Mesh(roundedSolid(5.88, 3.5, 0.27, 0.28, 0.055), silver);
+  const panelWidth = 7.3;
+  const panelHeight = 4.55;
+  const screenWidth = 6.72;
+  const screenHeight = 3.94;
+  const chassis = new THREE.Mesh(roundedSolid(panelWidth, panelHeight, 0.29, 0.28, 0.055), silver);
   chassis.castShadow = true;
   chassis.receiveShadow = true;
   display.add(chassis);
 
-  const rearShell = new THREE.Mesh(roundedSolid(5.68, 3.3, 0.23, 0.075, 0.028), rearPlastic);
+  const rearShell = new THREE.Mesh(roundedSolid(7.1, 4.35, 0.25, 0.075, 0.028), rearPlastic);
   rearShell.position.z = -0.17;
   rearShell.castShadow = true;
   rearShell.receiveShadow = true;
   display.add(rearShell);
 
-  const frame = new THREE.Mesh(roundedSolid(5.72, 3.34, 0.22, 0.11, 0.04), frameMaterial);
+  const frame = new THREE.Mesh(roundedSolid(7.12, 4.38, 0.24, 0.11, 0.04), frameMaterial);
   frame.position.z = 0.07;
   frame.castShadow = true;
   frame.receiveShadow = true;
   display.add(frame);
 
-  const ui = createUiTexture();
+  const ui = createInteractiveDesktopTexture({
+    onRotationRequest: () => {
+      const next = contentTarget > 0.5 ? 0 : 1;
+      contentTarget = next;
+      if (currentMode === "monitor") physicalTarget = next;
+    }
+  });
+  disposeUi = () => ui.dispose();
   const screenMaterial = new THREE.MeshBasicMaterial({ map: ui.texture, toneMapped: false });
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(5.32, 2.94), screenMaterial);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenWidth, screenHeight), screenMaterial);
   screen.position.z = 0.225;
   display.add(screen);
+  const screenInteractionPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(screenWidth, screenHeight),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  const screenInteriorHit = new THREE.Mesh(
+    new THREE.PlaneGeometry(screenWidth, screenHeight),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+  screenInteriorHit.position.z = 0.256;
+  screenInteriorHit.userData.action = "desktop";
+  display.add(screenInteriorHit);
 
   const glass = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.34, 2.96),
+    new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02),
     new THREE.MeshPhysicalMaterial({
-      color: 0xdce9ff,
+      color: 0xffffff,
       transparent: true,
-      opacity: 0.13,
-      roughness: 0.08,
-      metalness: 0.12,
+      opacity: 0.07,
+      roughness: 0.085,
+      metalness: 0,
+      ior: 1.48,
+      reflectivity: 0.86,
       clearcoat: 1,
-      clearcoatRoughness: 0.08,
+      clearcoatRoughness: 0.045,
       depthWrite: false
     })
   );
@@ -529,17 +727,90 @@ try {
   glass.renderOrder = 3;
   display.add(glass);
 
-  const reflection = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.25, 2.72),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.09, depthWrite: false })
+  const reflectionUniforms = {
+    uWarmCenter: { value: new THREE.Vector2(0.2, 0.68) },
+    uCoolCenter: { value: new THREE.Vector2(0.8, 0.48) },
+    uWarmDir: { value: new THREE.Vector2(0.48, 0.88).normalize() },
+    uCoolDir: { value: new THREE.Vector2(-0.3, 0.95).normalize() },
+    uWarmStrength: { value: 0.24 },
+    uCoolStrength: { value: 0.17 }
+  };
+  const reflectionMaterial = new THREE.ShaderMaterial({
+    uniforms: reflectionUniforms,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      varying vec2 vUv;
+      uniform vec2 uWarmCenter;
+      uniform vec2 uCoolCenter;
+      uniform vec2 uWarmDir;
+      uniform vec2 uCoolDir;
+      uniform float uWarmStrength;
+      uniform float uCoolStrength;
+
+      float roundedBoxDistance(vec2 point, vec2 bounds, float radius) {
+        vec2 q = abs(point) - bounds + radius;
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+      }
+
+      float streak(vec2 uv, vec2 center, vec2 direction, float width, float reach, float curve) {
+        vec2 alongAxis = normalize(direction);
+        vec2 acrossAxis = vec2(-alongAxis.y, alongAxis.x);
+        vec2 offset = uv - center;
+        float along = dot(offset, alongAxis);
+        float across = dot(offset, acrossAxis) + curve * along * along;
+        float softBand = exp(-0.5 * across * across / (width * width));
+        float taper = exp(-pow(abs(along) / reach, 4.0));
+        return softBand * taper;
+      }
+
+      void main() {
+        float edge = -roundedBoxDistance((vUv - 0.5) * vec2(6.74, 3.96), vec2(3.36, 1.97), 0.12);
+        float glassMask = smoothstep(0.0, 0.1, edge);
+        vec2 warmOffset = vUv - uWarmCenter;
+        vec2 coolOffset = vUv - uCoolCenter;
+
+        float warmWide = streak(vUv, uWarmCenter, uWarmDir, 0.105, 0.72, 0.24);
+        float warmCore = streak(vUv, uWarmCenter, uWarmDir, 0.025, 0.61, 0.19);
+        float warmGlow = exp(-dot(warmOffset, warmOffset) / 0.095);
+        float coolWide = streak(vUv, uCoolCenter, uCoolDir, 0.075, 0.66, -0.18);
+        float coolCore = streak(vUv, uCoolCenter, uCoolDir, 0.018, 0.56, -0.13);
+        float coolGlow = exp(-dot(coolOffset, coolOffset) / 0.075);
+
+        float warm = (warmWide * 0.58 + warmCore * 0.32 + warmGlow * 0.1) * uWarmStrength;
+        float cool = (coolWide * 0.58 + coolCore * 0.3 + coolGlow * 0.08) * uCoolStrength;
+        float total = warm + cool;
+        vec3 tint = (
+          vec3(1.0, 0.66, 0.35) * warm
+          + vec3(0.48, 0.7, 1.0) * cool
+        ) / max(total, 0.00001);
+        gl_FragColor = vec4(tint, glassMask * clamp(total, 0.0, 0.3));
+      }
+    `
+  });
+  const reflectionOverlay = new THREE.Mesh(
+    new THREE.PlaneGeometry(screenWidth + 0.02, screenHeight + 0.02),
+    reflectionMaterial
   );
-  reflection.position.set(-1.55, 0.5, 0.244);
-  reflection.rotation.z = -0.52;
-  reflection.renderOrder = 4;
-  display.add(reflection);
+  reflectionOverlay.position.z = 0.244;
+  reflectionOverlay.renderOrder = 4;
+  display.add(reflectionOverlay);
+  let warmReflectionRestLocal = null;
+  let coolReflectionRestLocal = null;
 
   const cameraPod = new THREE.Group();
-  cameraPod.position.set(0, 1.88, 0.015);
+  cameraPod.position.set(0, 2.4, 0.015);
   const cameraStem = new THREE.Mesh(roundedSolid(0.15, 0.24, 0.06, 0.13, 0.018), whitePlastic);
   cameraStem.position.y = -0.07;
   cameraStem.castShadow = true;
@@ -555,7 +826,7 @@ try {
   display.add(cameraPod);
 
   const reader = new THREE.Group();
-  reader.position.set(2.96, 0, 0.02);
+  reader.position.set(3.68, 0, 0.02);
   const readerBody = new THREE.Mesh(roundedSolid(0.22, 0.44, 0.1, 0.2, 0.022), silver);
   readerBody.castShadow = true;
   reader.add(readerBody);
@@ -592,7 +863,7 @@ try {
     toneMapped: false
   });
   const bubbleGroup = new THREE.Group();
-  bubbleGroup.position.set(2.03, 0, 0.265);
+  bubbleGroup.position.set(2.6, 0, 0.265);
   bubbleGroup.renderOrder = 10;
   display.add(bubbleGroup);
 
@@ -634,14 +905,14 @@ try {
   const trayHit = new THREE.Mesh(
     new THREE.PlaneGeometry(0.58, 0.42),
     new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
-  trayHit.position.set(2.36, -1.26, 0.255);
+  trayHit.position.set(3, -1.72, 0.255);
   trayHit.userData.action = "trigger";
   display.add(trayHit);
 
   // A single continuous bezel target prevents overlapping edge volumes from
   // choosing a different hidden edge at oblique podium angles.
   const edgeHit = new THREE.Mesh(
-    roundedRingSolid(6.12, 3.74, 0.34, 5.25, 2.87, 0.08, 0.52, 0.025),
+    roundedRingSolid(7.55, 4.78, 0.38, 6.62, 3.84, 0.1, 0.52, 0.025),
     new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0.001,
@@ -735,6 +1006,8 @@ try {
   let physicalTarget = 0;
   let contentProgress = 0;
   let contentTarget = 0;
+  demo.dataset.orientation = "landscape";
+  let screenOrientation = "landscape";
   let bubbleVisible = false;
   let bubbleShownAt = 0;
   let settingsVisibleUntil = 0;
@@ -743,6 +1016,8 @@ try {
   let pressedAt = 0;
   let bubbleHoldTriggered = false;
   let dragState = null;
+  let pendulumDragState = null;
+  let desktopPointerState = null;
   let orbitState = null;
   let guidedContentProgress = 0;
 
@@ -761,17 +1036,17 @@ try {
       sceneRig.rotation.y = 0;
       displayMount.position.set(0, 0.3, -0.12);
       displayMount.rotation.x = 0;
-      display.scale.setScalar(0.92);
+      display.scale.setScalar(0.88);
       cameraGoal.set(0, 0.6, 13);
       cameraLook.set(0, 0.28, 0);
     } else if (mode === "monitor") {
-      displayMount.position.set(0, 1.38, 0.62);
+      displayMount.position.set(0, 1.48, 0.62);
       displayMount.rotation.x = -0.1;
       display.scale.setScalar(0.84);
       cameraGoal.set(6.8, 4.8, 11.8);
       cameraLook.set(0, 0.1, 0);
     } else {
-      displayMount.position.set(0, 1.55, 0.82);
+      displayMount.position.set(0, 1.75, 0.82);
       displayMount.rotation.x = -0.14;
       display.scale.setScalar(1);
       cameraGoal.set(7.2, 5.4, 11.5);
@@ -780,13 +1055,27 @@ try {
 
     cameraGoal.x += stageOffsetX;
     cameraLook.x = stageOffsetX;
-
     for (const button of modeButtons) {
       button.setAttribute("aria-selected", String(button.dataset.demoMode === mode));
     }
   }
 
+  function updateDesktopOrientation(progress) {
+    const nextOrientation = progress > 0.5 ? "portrait" : "landscape";
+    if (nextOrientation !== screenOrientation) {
+      screenOrientation = nextOrientation;
+      ui.setOrientation(nextOrientation);
+    }
+    demo.dataset.orientation = nextOrientation;
+    ui.texture.center.set(0.5, 0.5);
+    ui.texture.rotation = mix(0, Math.PI / 2, clamp(progress));
+  }
+
   function restartGuide(message = "Watch once. Then the screen is yours.") {
+    const capturedPointerId = pressedPointerId;
+    if (desktopPointerState && !desktopPointerState.cancelled) {
+      ui.pointerCancel({ pointerId: desktopPointerState.pointerId });
+    }
     guided = !reduceMotion;
     guidedStartedAt = performance.now();
     physicalProgress = 0;
@@ -798,9 +1087,23 @@ try {
     pressedAction = null;
     pressedPointerId = null;
     dragState = null;
+    pendulumDragState = null;
+    desktopPointerState = null;
+    pendantOmega.set(0, 0, 0);
+    pendantDirection.copy(pendantRestDirection);
     orbitState = null;
     sceneRig.rotation.y = 0;
-    demo.classList.remove("is-interactive", "is-dragging", "is-orbiting", "pointer-inside");
+    demo.classList.remove(
+      "is-interactive",
+      "is-dragging",
+      "is-orbiting",
+      "is-light-dragging",
+      "pointer-inside"
+    );
+    forceVector?.classList.remove("is-blocked");
+    if (capturedPointerId !== null && canvas.hasPointerCapture(capturedPointerId)) {
+      canvas.releasePointerCapture(capturedPointerId);
+    }
     setPhase("guided", message);
   }
 
@@ -840,12 +1143,55 @@ try {
   }
 
   function setRayFromEvent(event) {
+    setRayFromClient(event.clientX, event.clientY);
+  }
+
+  function setRayFromClient(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     rayPosition.set(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1);
     syncInteractionMatrices();
     raycaster.setFromCamera(rayPosition, camera);
+  }
+
+  function projectWorldToClient(worldPoint) {
+    const rect = canvas.getBoundingClientRect();
+    const projected = worldPoint.clone().project(camera);
+    return {
+      x: rect.left + ((projected.x + 1) * 0.5) * rect.width,
+      y: rect.top + ((1 - projected.y) * 0.5) * rect.height
+    };
+  }
+
+  function getPendulumPickFromRay() {
+    const hit = raycaster.intersectObjects([pendantBulbHit, pendantCordHit], false)[0];
+    if (!hit) return null;
+    const occluder = raycaster.intersectObjects(
+      [screenInteriorHit, chassis, rearShell, frame, stage],
+      false
+    )[0];
+    if (occluder && occluder.distance + 0.02 < hit.distance) return null;
+    const part = hit.object.userData.part;
+    const grabRadius = part === "cord"
+      ? clamp(hit.point.clone().sub(pendantAnchor).dot(pendantDirection), pendantLength * 0.18, pendantLength)
+      : pendantLength + 0.34;
+    return { hit, part, grabRadius };
+  }
+
+  function getPendulumPick(event) {
+    setRayFromEvent(event);
+    return getPendulumPickFromRay();
+  }
+
+  function getFloorLightPickFromRay() {
+    const hit = raycaster.intersectObject(floorBulbHit, false)[0];
+    if (!hit) return null;
+    const occluder = raycaster.intersectObjects(
+      [screenInteriorHit, chassis, rearShell, frame, stage],
+      false
+    )[0];
+    return occluder && occluder.distance + 0.02 < hit.distance ? null : hit;
   }
 
   function getEdgePick(event) {
@@ -855,18 +1201,239 @@ try {
     return { localPoint: display.worldToLocal(hit.point.clone()) };
   }
 
+  function getDesktopPickFromRay() {
+    screenInteractionPlane.matrix.copy(screen.matrix);
+    screenInteractionPlane.matrixWorld.copy(screen.matrixWorld);
+    screenInteractionPlane.matrixAutoUpdate = false;
+    screenInteractionPlane.matrixWorldAutoUpdate = false;
+    const hit = raycaster.intersectObject(screenInteractionPlane, false)[0];
+    if (!hit?.uv) return null;
+    ui.texture.updateMatrix();
+    const uv = hit.uv.clone().applyMatrix3(ui.texture.matrix);
+    return { hit, uv };
+  }
+
+  function getDesktopPick(event) {
+    setRayFromEvent(event);
+    return getDesktopPickFromRay();
+  }
+
   function findAction(event) {
     setRayFromEvent(event);
     if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
     if (currentMode === "monitor") {
       if (raycaster.intersectObject(trayHit, false).length > 0) return "trigger";
       if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
+      if (getPendulumPickFromRay()) return "pendulum";
+      if (getFloorLightPickFromRay()) return "floor-light";
+      if (getDesktopPickFromRay()) return "desktop";
+      if (raycaster.intersectObject(screenInteriorHit, false).length > 0) return null;
       return raycaster.intersectObject(stage, false).length > 0 ? "orbit" : null;
     }
     if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
     if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
+    if (getPendulumPickFromRay()) return "pendulum";
+    if (getFloorLightPickFromRay()) return "floor-light";
+    if (getDesktopPickFromRay()) return "desktop";
+    if (raycaster.intersectObject(screenInteriorHit, false).length > 0) return null;
     if (currentMode !== "wall" && raycaster.intersectObject(stage, false).length > 0) return "orbit";
     return null;
+  }
+
+  function setUnitCylinderBetween(mesh, start, end, radius) {
+    const direction = new THREE.Vector3().subVectors(end, start);
+    const length = Math.max(0.001, direction.length());
+    mesh.position.copy(start).add(end).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    mesh.scale.set(radius, length, radius);
+  }
+
+  function updatePendantVisual() {
+    const bobPosition = pendantAnchor.clone().addScaledVector(pendantDirection, pendantLength);
+    const upCord = pendantDirection.clone().negate();
+    pendantGroup.position.copy(bobPosition);
+    pendantGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), upCord);
+    const cordEnd = new THREE.Vector3(0, 0.59, 0).applyQuaternion(pendantGroup.quaternion).add(bobPosition);
+    setUnitCylinderBetween(pendantCord, pendantAnchor, cordEnd, 0.022);
+    setUnitCylinderBetween(pendantCordHit, pendantAnchor, cordEnd, 0.16);
+    const lightPosition = new THREE.Vector3(0, -0.32, 0)
+      .applyQuaternion(pendantGroup.quaternion)
+      .add(bobPosition);
+    pendantLight.position.copy(lightPosition);
+  }
+
+  function updateReflectionUniforms() {
+    display.updateMatrixWorld(true);
+    const screenCenter = display.localToWorld(new THREE.Vector3(0, 0, 0.24));
+    const pendantLightWorld = pendantLight.getWorldPosition(new THREE.Vector3());
+    const studioLightWorld = studioLight.getWorldPosition(new THREE.Vector3());
+    const warmLocal = display.worldToLocal(pendantLightWorld.clone());
+    const coolLocal = display.worldToLocal(studioLightWorld.clone());
+    const warmCenter = reflectionUniforms.uWarmCenter.value;
+    const coolCenter = reflectionUniforms.uCoolCenter.value;
+    warmReflectionRestLocal ??= warmLocal.clone();
+    coolReflectionRestLocal ??= coolLocal.clone();
+    warmCenter.set(
+      clamp(0.24 + (warmLocal.x - warmReflectionRestLocal.x) / screenWidth * 0.78, -0.35, 1.35),
+      clamp(0.66 + (warmLocal.y - warmReflectionRestLocal.y) / screenHeight * 0.72, -0.35, 1.35)
+    );
+    coolCenter.set(
+      clamp(0.8 + (coolLocal.x - coolReflectionRestLocal.x) / screenWidth * 0.58, -0.35, 1.35),
+      clamp(0.48 + (coolLocal.y - coolReflectionRestLocal.y) / screenHeight * 0.55, -0.35, 1.35)
+    );
+
+    const anchorLocal = display.worldToLocal(pendantAnchor.clone());
+    const cableDirection = new THREE.Vector2(
+      warmLocal.x - anchorLocal.x,
+      warmLocal.y - anchorLocal.y
+    );
+    if (cableDirection.lengthSq() > 0.0001) {
+      cableDirection.normalize();
+      reflectionUniforms.uWarmDir.value.lerp(cableDirection, 0.18).normalize();
+    }
+
+    const frontNormal = new THREE.Vector3(0, 0, 1).transformDirection(display.matrixWorld);
+    const warmFacing = clamp(frontNormal.dot(pendantLightWorld.clone().sub(screenCenter).normalize()) * 2.2);
+    const coolFacing = clamp(frontNormal.dot(studioLightWorld.clone().sub(screenCenter).normalize()) * 2.2);
+    const warmDistance = pendantLightWorld.distanceTo(screenCenter);
+    reflectionUniforms.uWarmStrength.value = 0.34 * warmFacing * clamp(8 / Math.max(5, warmDistance), 0.55, 1.25);
+    reflectionUniforms.uCoolStrength.value = 0.24 * coolFacing * floorLightLevel;
+  }
+
+  function updateFloorLight(deltaSeconds) {
+    const ease = 1 - Math.exp(-deltaSeconds * 6.5);
+    floorLightLevel = mix(floorLightLevel, floorLightTarget, ease);
+    if (Math.abs(floorLightLevel - floorLightTarget) < 0.001) {
+      floorLightLevel = floorLightTarget;
+    }
+    studioLight.intensity = floorLightLevels.spotlight * floorLightLevel;
+    floorBulbFill.intensity = floorLightLevels.fill * floorLightLevel;
+    floorBulbGlassMaterial.emissiveIntensity = floorLightLevels.glassEmissive * floorLightLevel;
+    floorBulbCoreMaterial.emissiveIntensity = floorLightLevels.coreEmissive * floorLightLevel;
+    floorBulbFlareMaterial.opacity = floorLightLevels.flareOpacity * floorLightLevel;
+  }
+
+  function getPendulumForce() {
+    if (!pendulumDragState) return null;
+    const heldPoint = pendantAnchor.clone().addScaledVector(
+      pendantDirection,
+      pendulumDragState.grabRadius
+    );
+    const projectedHeld = projectWorldToClient(heldPoint);
+    const projectedAnchor = projectWorldToClient(pendantAnchor);
+    const pointerX = pendulumDragState.pointerX - pendulumDragState.pointerOffsetX;
+    const pointerY = pendulumDragState.pointerY - pendulumDragState.pointerOffsetY;
+    const forceX = pointerX - projectedHeld.x;
+    const forceY = pointerY - projectedHeld.y;
+    const radialX = projectedHeld.x - projectedAnchor.x;
+    const radialY = projectedHeld.y - projectedAnchor.y;
+    const radialLength = Math.hypot(radialX, radialY);
+    if (radialLength < 0.01) return { x: forceX, y: forceY };
+    const unitRadialX = radialX / radialLength;
+    const unitRadialY = radialY / radialLength;
+    const radialForce = forceX * unitRadialX + forceY * unitRadialY;
+    return {
+      x: forceX - unitRadialX * radialForce,
+      y: forceY - unitRadialY * radialForce
+    };
+  }
+
+  function constrainReducedMotionPendulum() {
+    if (!pendulumDragState) return;
+    const adjustedX = pendulumDragState.pointerX - pendulumDragState.pointerOffsetX;
+    const adjustedY = pendulumDragState.pointerY - pendulumDragState.pointerOffsetY;
+    setRayFromClient(adjustedX, adjustedY);
+
+    const radius = pendulumDragState.grabRadius;
+    const originFromAnchor = raycaster.ray.origin.clone().sub(pendantAnchor);
+    const rayDirection = raycaster.ray.direction;
+    const b = originFromAnchor.dot(rayDirection);
+    const c = originFromAnchor.lengthSq() - radius * radius;
+    const discriminant = b * b - c;
+    const currentPoint = pendantAnchor.clone().addScaledVector(pendantDirection, radius);
+    let constrainedPoint;
+
+    if (discriminant >= 0) {
+      const root = Math.sqrt(discriminant);
+      const nearT = -b - root;
+      const farT = -b + root;
+      const nearPoint = raycaster.ray.at(nearT, new THREE.Vector3());
+      const farPoint = raycaster.ray.at(farT, new THREE.Vector3());
+      if (pendulumDragState.rootBranch === null) {
+        if (nearT < 0 && farT >= 0) pendulumDragState.rootBranch = "far";
+        else if (farT < 0 && nearT >= 0) pendulumDragState.rootBranch = "near";
+        else {
+          pendulumDragState.rootBranch = nearPoint.distanceToSquared(currentPoint)
+            <= farPoint.distanceToSquared(currentPoint) ? "near" : "far";
+        }
+      }
+      constrainedPoint = pendulumDragState.rootBranch === "near" ? nearPoint : farPoint;
+    } else {
+      const closestT = Math.max(
+        0,
+        pendantAnchor.clone().sub(raycaster.ray.origin).dot(rayDirection)
+      );
+      const radial = raycaster.ray.at(closestT, new THREE.Vector3()).sub(pendantAnchor);
+      if (radial.lengthSq() < 0.000001) radial.copy(pendantDirection);
+      constrainedPoint = pendantAnchor.clone().add(radial.normalize().multiplyScalar(radius));
+    }
+
+    const nextDirection = constrainedPoint.sub(pendantAnchor);
+    if (nextDirection.lengthSq() > 0.000001) pendantDirection.copy(nextDirection.normalize());
+    pendantOmega.set(0, 0, 0);
+  }
+
+  function integratePendulum(deltaSeconds, driveForce = null) {
+    if (frozenTime !== null || reduceMotion) return;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const dragScale = Math.max(190, canvas.getBoundingClientRect().height * 0.42);
+    const driveWorld = driveForce
+      ? right.multiplyScalar(driveForce.x / dragScale)
+        .add(up.multiplyScalar(-driveForce.y / dragScale))
+      : null;
+
+    let remaining = deltaSeconds;
+    const gravity = new THREE.Vector3(0, -9.81, 0);
+    while (remaining > 0) {
+      const step = Math.min(1 / 120, remaining);
+      const angularAcceleration = new THREE.Vector3()
+        .crossVectors(pendantDirection, gravity)
+        .multiplyScalar(1 / pendantLength);
+      if (driveWorld) {
+        angularAcceleration.add(
+          new THREE.Vector3()
+            .crossVectors(pendantDirection, driveWorld)
+            .multiplyScalar(18 / pendantLength)
+        );
+      }
+      pendantOmega.addScaledVector(angularAcceleration, step);
+      pendantOmega.multiplyScalar(Math.exp(-(driveWorld ? 2.6 : 0.62) * step));
+      pendantOmega.addScaledVector(
+        pendantDirection,
+        -pendantOmega.dot(pendantDirection)
+      );
+      if (pendantOmega.length() > 5.2) pendantOmega.setLength(5.2);
+      pendantDirection.addScaledVector(
+        new THREE.Vector3().crossVectors(pendantOmega, pendantDirection),
+        step
+      ).normalize();
+      remaining -= step;
+    }
+  }
+
+  function updatePendulum(deltaSeconds) {
+    if (pendulumDragState) {
+      if (reduceMotion) constrainReducedMotionPendulum();
+      else integratePendulum(deltaSeconds, getPendulumForce());
+    } else if (frozenTime === null && !reduceMotion) {
+      integratePendulum(deltaSeconds);
+      if (pendantOmega.lengthSq() < 0.000003 && pendantDirection.distanceToSquared(pendantRestDirection) < 0.00002) {
+        pendantOmega.set(0, 0, 0);
+        pendantDirection.copy(pendantRestDirection);
+      }
+    }
+    updatePendantVisual();
   }
 
   function projectGripToDemo(localPoint) {
@@ -955,6 +1522,42 @@ try {
     }
   }
 
+  function updatePendulumDragVisual() {
+    if (!pendulumDragState) return;
+    const demoRect = demo.getBoundingClientRect();
+    const heldPoint = pendantAnchor.clone().addScaledVector(
+      pendantDirection,
+      pendulumDragState.grabRadius
+    );
+    const projected = projectWorldToClient(heldPoint);
+    const gripPoint = {
+      x: projected.x - demoRect.left,
+      y: projected.y - demoRect.top
+    };
+    const pointerPoint = {
+      x: pendulumDragState.pointerX - pendulumDragState.pointerOffsetX - demoRect.left,
+      y: pendulumDragState.pointerY - pendulumDragState.pointerOffsetY - demoRect.top
+    };
+    if (gripElement) {
+      gripElement.style.left = `${gripPoint.x}px`;
+      gripElement.style.top = `${gripPoint.y}px`;
+    }
+    if (forceLine) {
+      forceLine.setAttribute("x1", String(gripPoint.x));
+      forceLine.setAttribute("y1", String(gripPoint.y));
+      forceLine.setAttribute("x2", String(pointerPoint.x));
+      forceLine.setAttribute("y2", String(pointerPoint.y));
+    }
+    if (forceEnd) {
+      forceEnd.setAttribute("cx", String(pointerPoint.x));
+      forceEnd.setAttribute("cy", String(pointerPoint.y));
+    }
+    const rawForce = Math.hypot(pointerPoint.x - gripPoint.x, pointerPoint.y - gripPoint.y);
+    const swingForce = getPendulumForce();
+    const usefulForce = swingForce ? Math.hypot(swingForce.x, swingForce.y) : 0;
+    forceVector?.classList.toggle("is-blocked", rawForce > 18 && usefulForce < rawForce * 0.12);
+  }
+
   function updateInteractiveCaption() {
     if (dragState) setPhase("dragging", "dragging");
     else if (Math.abs(contentTarget - physicalProgress) > 0.025) setPhase("ready-to-swivel", "ready");
@@ -992,7 +1595,7 @@ try {
 
   function setCursorAction(action) {
     if (!cursorElement) return;
-    const gripping = action === "edge" || action === "orbit";
+    const gripping = action === "edge" || action === "orbit" || action === "pendulum";
     cursorElement.src = gripping ? "assets/3d/grip-hand.png" : "assets/3d/pointer-hand.png";
     cursorElement.classList.toggle("is-grip", gripping);
   }
@@ -1007,10 +1610,18 @@ try {
     if (pressedPointerId === null || event.pointerId !== pressedPointerId) return;
     if (dragState) physicalTarget = dragState.startProgress;
     dragState = null;
+    pendulumDragState = null;
+    if (desktopPointerState) {
+      if (!desktopPointerState.cancelled) {
+        ui.pointerCancel({ pointerId: event.pointerId });
+      }
+    }
+    desktopPointerState = null;
+    pendantOmega.set(0, 0, 0);
     orbitState = null;
     pressedAction = null;
     pressedPointerId = null;
-    demo.classList.remove("is-dragging", "is-orbiting");
+    demo.classList.remove("is-dragging", "is-orbiting", "is-light-dragging");
     demo.classList.toggle("pointer-inside", pointerIsInsideCanvas(event));
     forceVector?.classList.remove("is-blocked");
     releaseDragCursor(event);
@@ -1021,7 +1632,7 @@ try {
     if (!guided) demo.classList.add("pointer-inside");
   });
   canvas.addEventListener("pointerleave", () => {
-    if (!dragState && !orbitState) demo.classList.remove("pointer-inside");
+    if (!dragState && !pendulumDragState && !desktopPointerState && !orbitState) demo.classList.remove("pointer-inside");
   });
   canvas.addEventListener("pointermove", (event) => {
     if (guided) return;
@@ -1037,6 +1648,31 @@ try {
       dragState.pointerX = event.clientX;
       dragState.pointerY = event.clientY;
       updateInteractiveCaption();
+      return;
+    }
+
+    if (pendulumDragState) {
+      pendulumDragState.pointerX = event.clientX;
+      pendulumDragState.pointerY = event.clientY;
+      if (reduceMotion) {
+        constrainReducedMotionPendulum();
+        updatePendantVisual();
+      }
+      updatePendulumDragVisual();
+      setCursorAction("pendulum");
+      return;
+    }
+
+    if (desktopPointerState) {
+      const pick = getDesktopPick(event);
+      if (pick && !desktopPointerState.cancelled) {
+        desktopPointerState.lastUv.copy(pick.uv);
+        ui.pointerMove(pick.uv, { pointerId: event.pointerId });
+      } else if (!pick && !desktopPointerState.cancelled) {
+        ui.pointerCancel({ pointerId: event.pointerId });
+        desktopPointerState.cancelled = true;
+      }
+      setCursorAction("desktop");
       return;
     }
 
@@ -1061,7 +1697,7 @@ try {
     setCursorAction(action);
   });
   canvas.addEventListener("pointerdown", (event) => {
-    if (dragState || orbitState || pressedPointerId !== null) return;
+    if (dragState || pendulumDragState || desktopPointerState || orbitState || pressedPointerId !== null) return;
     interruptGuide();
     noteActivity();
     const action = findAction(event);
@@ -1092,6 +1728,44 @@ try {
       forceVector?.classList.remove("is-blocked");
       updateDragVisual();
       demo.classList.add("is-dragging");
+    } else if (action === "pendulum") {
+      const pick = getPendulumPick(event);
+      if (!pick) {
+        pressedAction = null;
+        pressedPointerId = null;
+        return;
+      }
+      const grabRadius = pick.grabRadius;
+      const currentGrabPoint = pendantAnchor.clone().addScaledVector(pendantDirection, grabRadius);
+      const projectedGrab = projectWorldToClient(currentGrabPoint);
+      pendulumDragState = {
+        pointerId: event.pointerId,
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+        pointerOffsetX: event.clientX - projectedGrab.x,
+        pointerOffsetY: event.clientY - projectedGrab.y,
+        grabRadius,
+        rootBranch: null
+      };
+      pendantOmega.set(0, 0, 0);
+      updatePendulumDragVisual();
+      setCursorAction("pendulum");
+      forceVector?.classList.remove("is-blocked");
+      demo.classList.add("is-light-dragging");
+    } else if (action === "desktop") {
+      const pick = getDesktopPick(event);
+      if (!pick) {
+        pressedAction = null;
+        pressedPointerId = null;
+        return;
+      }
+      desktopPointerState = {
+        pointerId: event.pointerId,
+        lastUv: pick.uv.clone(),
+        cancelled: false
+      };
+      ui.pointerDown(pick.uv, { pointerId: event.pointerId });
+      setCursorAction("desktop");
     } else if (action === "orbit") {
       orbitState = { pointerId: event.pointerId, lastX: event.clientX };
       setCursorAction("orbit");
@@ -1119,15 +1793,35 @@ try {
       forceVector?.classList.remove("is-blocked");
       releaseDragCursor(event);
       updateInteractiveCaption();
+    } else if (pendulumDragState) {
+      pendulumDragState = null;
+      demo.classList.remove("is-light-dragging");
+      forceVector?.classList.remove("is-blocked");
+      releaseDragCursor(event);
+    } else if (desktopPointerState) {
+      if (!desktopPointerState.cancelled) {
+        const pick = getDesktopPick(event);
+        if (pick) {
+          ui.pointerUp(pick.uv, { pointerId: event.pointerId });
+        } else {
+          ui.pointerCancel({ pointerId: event.pointerId });
+        }
+      }
+      desktopPointerState = null;
+      releaseDragCursor(event);
     } else if (orbitState) {
       orbitState = null;
       demo.classList.remove("is-orbiting");
       releaseDragCursor(event);
+    } else if (pressedAction === "floor-light" && findAction(event) === "floor-light") {
+      floorLightTarget = floorLightTarget > 0.5 ? 0 : 1;
+      demo.dataset.floorLight = floorLightTarget > 0.5 ? "on" : "off";
     } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
       if (currentMode === "monitor") {
-        const next = contentTarget > 0.5 ? 0 : 1;
+        const next = Math.max(contentTarget, physicalTarget, contentProgress, physicalProgress) > 0.5 ? 0 : 1;
         contentTarget = next;
         physicalTarget = next;
+        demo.dataset.orientation = next > 0.5 ? "portrait" : "landscape";
         bubbleVisible = false;
       } else {
         bubbleVisible ? (bubbleVisible = false) : showBubble(now);
@@ -1148,6 +1842,16 @@ try {
   });
   canvas.addEventListener("pointercancel", cancelActivePointer);
   canvas.addEventListener("lostpointercapture", cancelActivePointer);
+  canvas.addEventListener("wheel", (event) => {
+    if (guided) interruptGuide();
+    const pick = getDesktopPick(event);
+    if (!pick) return;
+    const result = ui.wheel(pick.uv, event.deltaY);
+    if (result.handled) {
+      event.preventDefault();
+      noteActivity();
+    }
+  }, { passive: false });
 
   for (const button of modeButtons) {
     button.addEventListener("click", () => {
@@ -1164,6 +1868,8 @@ try {
     lastFrameAt = time;
     camera.position.lerp(cameraGoal, 1 - Math.exp(-deltaSeconds * 7));
     camera.lookAt(cameraLook);
+    updatePendulum(deltaSeconds);
+    updateFloorLight(deltaSeconds);
 
     if (!guided && time - lastActivityAt >= 20000) {
       restartGuide("Need a hand? Here it comes.");
@@ -1193,7 +1899,9 @@ try {
       const settingsOpacity = settingsVisibleUntil > time ? 1 : 0;
       display.rotation.z = mix(0, -Math.PI / 2, physicalProgress);
       if (dragState) updateDragVisual();
-      ui.draw(mix(0, Math.PI / 2, contentProgress), currentMode);
+      if (pendulumDragState) updatePendulumDragVisual();
+      updateDesktopOrientation(contentProgress);
+      ui.draw(time);
       bubbleGroup.rotation.z = -display.rotation.z;
       bubbleMaterial.opacity = bubbleVisible ? 1 : 0;
       bubbleGroup.scale.setScalar(bubbleVisible ? 1 : 0.25);
@@ -1203,6 +1911,7 @@ try {
       settingsBubble.visible = settingsOpacity > 0;
       pointer.visible = false;
       grip.visible = false;
+      updateReflectionUniforms();
       renderer.render(scene, camera);
       scheduleFrame(animate);
       return;
@@ -1222,10 +1931,10 @@ try {
     let pointerToTarget = triggerTarget;
     let pointerMove = 1;
     let gripOpacity = 0;
-    let gripCorner = new THREE.Vector3(2.82, 1.63, 0.2);
+    let gripCorner = new THREE.Vector3(3.55, 2.2, 0.2);
 
     if (currentMode === "monitor") {
-      bubbleOpacity = 0;
+      if (t < 8.35) bubbleOpacity = 0;
       if (t < 1.25) {
         setPhase("monitor-landscape", "monitor landscape");
       } else if (t < 2.1) {
@@ -1262,19 +1971,19 @@ try {
         scheduleFrame(animate);
         return;
       }
-    } else if (t < 1.15) {
+    } else if (currentMode !== "monitor" && t < 1.15) {
       setPhase("landscape", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the fingerprint reader");
-    } else if (t < 2.2) {
+    } else if (currentMode !== "monitor" && t < 2.2) {
       setPhase("touch-reader", currentMode === "monitor" ? "Click Swivel in the tray" : "Touch the edge reader");
       pointerPress = segment(t, 1.82, 2.08) * (1 - segment(t, 2.08, 2.2));
-    } else if (t < 3.05) {
+    } else if (currentMode !== "monitor" && t < 3.05) {
       setPhase("bubble-appears", "The blue button appears on screen");
       bubbleOpacity = segment(t, 2.2, 2.58);
       bubbleScale = mix(0.25, 1, segment(t, 2.2, 2.68));
       bubbleProgress = segment(t, 2.2, 4.2) * 0.46;
       pointerToTarget = "bubble";
       pointerMove = segment(t, 2.48, 3.02);
-    } else if (t < 4.2) {
+    } else if (currentMode !== "monitor" && t < 4.2) {
       setPhase("tap-bubble", "Tap the blue button");
       bubbleOpacity = 1;
       bubbleProgress = mix(0.46, 0.63, segment(t, 3.05, 4.2));
@@ -1282,13 +1991,13 @@ try {
       pointerToTarget = "bubble";
       pointerPress = segment(t, 3.82, 4.05) * (1 - segment(t, 4.05, 4.2));
       bubbleScale = 1 - pointerPress * 0.14;
-    } else if (t < 5.15) {
-      setPhase("pixels-turn", "Windows turns the pixels first");
+    } else if (currentMode !== "monitor" && t < 5.15) {
+      setPhase("pixels-turn", "The pixels turn first");
       contentAngle = mix(0, Math.PI / 2, segment(t, 4.2, 5.1));
       bubbleOpacity = 1 - segment(t, 4.2, 4.55);
       pointerFromTarget = "bubble";
       pointerToTarget = "bubble";
-    } else if (t < 7.25) {
+    } else if (currentMode !== "monitor" && t < 7.25) {
       setPhase("swivel-portrait", "Now swivel the right side down");
       contentAngle = Math.PI / 2;
       panelAngle = mix(0, -Math.PI / 2, segment(t, 5.55, 6.95));
@@ -1300,18 +2009,18 @@ try {
       pointerPortraitAmount = releaseGrip;
       pointerOpacity = 1 - takeGrip + releaseGrip;
       gripOpacity = takeGrip * (1 - releaseGrip);
-    } else if (t < 8.4) {
+    } else if (currentMode !== "monitor" && t < 8.4) {
       setPhase("portrait", "Portrait. Very dignified.");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
       pointerPortraitAmount = 1;
-    } else if (t < 9.45) {
+    } else if (currentMode !== "monitor" && t < 9.45) {
       setPhase("touch-reader-portrait", currentMode === "monitor" ? "Click the tray icon again" : "Touch the reader at the bottom");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
       pointerPortraitAmount = 1;
       pointerPress = segment(t, 9.03, 9.27) * (1 - segment(t, 9.27, 9.45));
-    } else if (t < 10.3) {
+    } else if (currentMode !== "monitor" && t < 10.3) {
       setPhase("bubble-portrait", "The button follows the reader");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
@@ -1320,7 +2029,7 @@ try {
       pointerMove = segment(t, 9.72, 10.26);
       bubbleOpacity = segment(t, 9.45, 9.82);
       bubbleScale = mix(0.25, 1, segment(t, 9.45, 9.92));
-    } else if (t < 11.45) {
+    } else if (currentMode !== "monitor" && t < 11.45) {
       setPhase("tap-bubble-portrait", "Tap once more");
       contentAngle = Math.PI / 2;
       panelAngle = -Math.PI / 2;
@@ -1330,18 +2039,18 @@ try {
       pointerPress = segment(t, 11.02, 11.25) * (1 - segment(t, 11.25, 11.45));
       bubbleOpacity = 1;
       bubbleScale = 1 - pointerPress * 0.14;
-    } else if (t < 12.4) {
-      setPhase("pixels-return", "Windows turns the pixels back");
+    } else if (currentMode !== "monitor" && t < 12.4) {
+      setPhase("pixels-return", "The pixels turn back");
       contentAngle = mix(Math.PI / 2, 0, segment(t, 11.45, 12.35));
       panelAngle = -Math.PI / 2;
       pointerPortraitAmount = 1;
       pointerFromTarget = "bubble";
       pointerToTarget = "bubble";
       bubbleOpacity = 1 - segment(t, 11.45, 11.8);
-    } else if (t < 14.55) {
+    } else if (currentMode !== "monitor" && t < 14.55) {
       setPhase("swivel-landscape", "Lift the right side back up");
       panelAngle = mix(-Math.PI / 2, 0, segment(t, 12.8, 14.2));
-      gripCorner = new THREE.Vector3(-2.82, 1.63, 0.2);
+      gripCorner = new THREE.Vector3(-3.55, 2.2, 0.2);
       const takeGrip = segment(t, 12.4, 12.88);
       const releaseGrip = segment(t, 14.08, 14.55);
       pointerFromTarget = takeGrip < 1 ? "bubble" : "grip";
@@ -1361,7 +2070,8 @@ try {
 
     guidedContentProgress = clamp(contentAngle / (Math.PI / 2));
     display.rotation.z = panelAngle;
-    ui.draw(contentAngle, currentMode);
+    updateDesktopOrientation(contentAngle / (Math.PI / 2));
+    ui.draw(time);
     bubbleGroup.rotation.z = -panelAngle;
     bubbleMaterial.opacity = bubbleOpacity;
     bubbleGroup.scale.setScalar(bubbleScale);
@@ -1371,9 +2081,9 @@ try {
     settingsBubble.visible = false;
 
     if (pointerOpacity > 0.002) {
-      const sensorTarget = getWorldPosition(new THREE.Vector3(2.96, 0, 0.32));
-      const bubbleTarget = getWorldPosition(new THREE.Vector3(2.03, 0, 0.34));
-      const trayTarget = getWorldPosition(new THREE.Vector3(2.36, -1.26, 0.3));
+      const sensorTarget = getWorldPosition(new THREE.Vector3(3.68, 0, 0.32));
+      const bubbleTarget = getWorldPosition(new THREE.Vector3(2.6, 0, 0.34));
+      const trayTarget = getWorldPosition(new THREE.Vector3(3, -1.72, 0.3));
       const gripTarget = getGripPosition(gripCorner);
       const resolvePointerTarget = (name) => {
         if (name === "grip") return gripTarget;
@@ -1395,6 +2105,7 @@ try {
       grip.visible = false;
     }
 
+    updateReflectionUniforms();
     renderer.render(scene, camera);
     scheduleFrame(animate);
   }
@@ -1404,7 +2115,7 @@ try {
     const width = Math.max(1, Math.floor(rect.width));
     const height = Math.max(1, Math.floor(rect.height));
     const aspect = width / height;
-    const verticalHalf = 5.8;
+    const verticalHalf = 6.35;
     camera.left = -verticalHalf * aspect;
     camera.right = verticalHalf * aspect;
     camera.top = verticalHalf;
@@ -1435,7 +2146,15 @@ return () => {
   disposed = true;
   cancelAnimationFrame(animationFrame);
   observer?.disconnect();
+  disposeUi?.();
   renderer?.dispose();
-  demo.classList.remove("webgl-ready", "is-interactive", "is-dragging", "is-orbiting", "pointer-inside");
+  demo.classList.remove(
+    "webgl-ready",
+    "is-interactive",
+    "is-dragging",
+    "is-orbiting",
+    "is-light-dragging",
+    "pointer-inside"
+  );
 };
 }

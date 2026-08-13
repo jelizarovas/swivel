@@ -23,8 +23,8 @@ const INFO_LINKS = [
 export function HeroCopy({ openModal }) {
   return (
     <div className="hero-copy relative z-2 min-w-0">
-      <h1 id="hero-title">One tap.<br />Ninety degrees.<br /><em>Zero menus.</em></h1>
-      <p className="lede">The Surface Hub rotates. Windows makes you hunt through Settings. Swivel turns the whole job into one tap. It is free, tiny, and does exactly one thing. An increasingly suspicious concept in software.</p>
+      <h1 id="hero-title">Tap the edge.<br />Tap the bubble.<br /><em>Settings can sulk.</em></h1>
+      <p className="lede">Swivel puts display rotation where your hand already is. Tap the edge reader, tap the blue button, then turn the screen. Free, tiny, and blissfully uninterested in doing anything else.</p>
 
       <div className="downloads flex" aria-label="Download choices">
         {DOWNLOADS.map((download) => (
@@ -40,7 +40,7 @@ export function HeroCopy({ openModal }) {
       </div>
 
       <p className="release-meta">Latest: <strong>v0.1.5</strong> · released Aug 11, 2026</p>
-      <p className="runtime-note">Try the regular download first. If Windows asks for .NET 8, install it or use Standalone.</p>
+      <p className="runtime-note">Try the regular download first. If the .NET 8 Desktop Runtime is missing, install it or use Standalone.</p>
 
       <div className="info-actions flex flex-wrap" aria-label="More information">
         {INFO_LINKS.map(([id, label]) => (
