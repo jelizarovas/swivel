@@ -661,7 +661,7 @@ try {
   const panelWidth = 7.3;
   const panelHeight = 4.55;
   const screenWidth = 6.72;
-  const screenHeight = 3.94;
+  const screenHeight = 3.78;
   const chassis = new THREE.Mesh(roundedSolid(panelWidth, panelHeight, 0.29, 0.28, 0.055), silver);
   chassis.castShadow = true;
   chassis.receiveShadow = true;
@@ -776,7 +776,7 @@ try {
       }
 
       void main() {
-        float edge = -roundedBoxDistance((vUv - 0.5) * vec2(6.74, 3.96), vec2(3.36, 1.97), 0.12);
+        float edge = -roundedBoxDistance((vUv - 0.5) * vec2(6.74, 3.80), vec2(3.36, 1.89), 0.12);
         float glassMask = smoothstep(0.0, 0.1, edge);
         vec2 warmOffset = vUv - uWarmCenter;
         vec2 coolOffset = vUv - uCoolCenter;
@@ -902,13 +902,6 @@ try {
   settingsBubble.renderOrder = 13;
   bubbleGroup.add(settingsBubble);
 
-  const trayHit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.58, 0.42),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
-  trayHit.position.set(3, -1.72, 0.255);
-  trayHit.userData.action = "trigger";
-  display.add(trayHit);
-
   // A single continuous bezel target prevents overlapping edge volumes from
   // choosing a different hidden edge at oblique podium angles.
   const edgeHit = new THREE.Mesh(
@@ -1029,7 +1022,6 @@ try {
     monitorStand.visible = mode === "monitor";
     stage.visible = mode !== "wall";
     reader.visible = mode !== "monitor";
-    trayHit.visible = mode === "monitor";
 
     displayMount.rotation.y = 0;
     if (mode === "wall") {
@@ -1061,14 +1053,19 @@ try {
   }
 
   function updateDesktopOrientation(progress) {
-    const nextOrientation = progress > 0.5 ? "portrait" : "landscape";
+    const normalizedProgress = clamp(progress);
+    const nextOrientation = normalizedProgress >= 0.5 ? "portrait" : "landscape";
+
+    // Switch the responsive layout and quarter-turn together. Continuously
+    // rotating one resizable canvas makes its corners leave the UV square,
+    // which stretches edge pixels until the turn settles.
     if (nextOrientation !== screenOrientation) {
       screenOrientation = nextOrientation;
       ui.setOrientation(nextOrientation);
     }
     demo.dataset.orientation = nextOrientation;
     ui.texture.center.set(0.5, 0.5);
-    ui.texture.rotation = mix(0, Math.PI / 2, clamp(progress));
+    ui.texture.rotation = nextOrientation === "portrait" ? Math.PI / 2 : 0;
   }
 
   function restartGuide(message = "Watch once. Then the screen is yours.") {
@@ -1218,11 +1215,33 @@ try {
     return getDesktopPickFromRay();
   }
 
+  function getCapturedDesktopPick(event) {
+    setRayFromEvent(event);
+    const hit = getDesktopPickFromRay();
+    if (hit) return hit;
+
+    // Pointer capture keeps delivering events after the cursor leaves the
+    // projected bezel. Continue the gesture on the display's infinite plane
+    // and clamp to its nearest screen edge instead of canceling the scroll.
+    const screenWorldPosition = screen.getWorldPosition(new THREE.Vector3());
+    const screenWorldNormal = new THREE.Vector3(0, 0, 1).transformDirection(screen.matrixWorld);
+    const screenPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(screenWorldNormal, screenWorldPosition);
+    const worldPoint = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(screenPlane, worldPoint)) return null;
+
+    const localPoint = screen.worldToLocal(worldPoint);
+    const rawUv = new THREE.Vector2(
+      clamp(localPoint.x / screenWidth + 0.5),
+      clamp(localPoint.y / screenHeight + 0.5)
+    );
+    ui.texture.updateMatrix();
+    return { hit: null, uv: rawUv.applyMatrix3(ui.texture.matrix) };
+  }
+
   function findAction(event) {
     setRayFromEvent(event);
     if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
     if (currentMode === "monitor") {
-      if (raycaster.intersectObject(trayHit, false).length > 0) return "trigger";
       if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
       if (getPendulumPickFromRay()) return "pendulum";
       if (getFloorLightPickFromRay()) return "floor-light";
@@ -1664,10 +1683,11 @@ try {
     }
 
     if (desktopPointerState) {
-      const pick = getDesktopPick(event);
+      const pick = getCapturedDesktopPick(event);
       if (pick && !desktopPointerState.cancelled) {
         desktopPointerState.lastUv.copy(pick.uv);
-        ui.pointerMove(pick.uv, { pointerId: event.pointerId });
+        const result = ui.pointerMove(pick.uv, { pointerId: event.pointerId });
+        if (result.action === "feed-scroll") demo.dataset.feedScrolled = "true";
       } else if (!pick && !desktopPointerState.cancelled) {
         ui.pointerCancel({ pointerId: event.pointerId });
         desktopPointerState.cancelled = true;
@@ -1764,7 +1784,10 @@ try {
         lastUv: pick.uv.clone(),
         cancelled: false
       };
-      ui.pointerDown(pick.uv, { pointerId: event.pointerId });
+      const result = ui.pointerDown(pick.uv, { pointerId: event.pointerId });
+      if (["desktop", "feed", "whiteboard", "video"].includes(result.action)) {
+        demo.dataset.desktopMode = result.action;
+      }
       setCursorAction("desktop");
     } else if (action === "orbit") {
       orbitState = { pointerId: event.pointerId, lastX: event.clientX };
@@ -1788,6 +1811,9 @@ try {
       physicalTarget = startedPortrait
         ? (releaseProgress <= 0.15 ? 0 : 1)
         : (releaseProgress >= 0.85 ? 1 : 0);
+      // The demo's virtual desktop follows the physical snap so it remains
+      // upright and receives vertical feed gestures in portrait.
+      contentTarget = physicalTarget;
       dragState = null;
       demo.classList.remove("is-dragging");
       forceVector?.classList.remove("is-blocked");
@@ -1850,6 +1876,7 @@ try {
     if (result.handled) {
       event.preventDefault();
       noteActivity();
+      if (result.action === "feed-scroll") demo.dataset.feedScrolled = "true";
     }
   }, { passive: false });
 
@@ -2083,7 +2110,9 @@ try {
     if (pointerOpacity > 0.002) {
       const sensorTarget = getWorldPosition(new THREE.Vector3(3.68, 0, 0.32));
       const bubbleTarget = getWorldPosition(new THREE.Vector3(2.6, 0, 0.34));
-      const trayTarget = getWorldPosition(new THREE.Vector3(3, -1.72, 0.3));
+      const trayLandscapeLocal = new THREE.Vector3(2.5, -1.77, 0.3);
+      const trayPortraitLocal = new THREE.Vector3(3.11, 1.19, 0.3);
+      const trayTarget = getWorldPosition(trayLandscapeLocal.lerp(trayPortraitLocal, pointerPortraitAmount));
       const gripTarget = getGripPosition(gripCorner);
       const resolvePointerTarget = (name) => {
         if (name === "grip") return gripTarget;

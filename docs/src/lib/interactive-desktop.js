@@ -64,6 +64,8 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
 
   function resizeCanvas() {
     const portrait = state.orientation === "portrait";
+    // Match the modeled 16:9 glass exactly. Portrait uses the reciprocal
+    // dimensions so circles and type keep the same proportions after turning.
     const nextWidth = portrait ? 720 : 1280;
     const nextHeight = portrait ? 1280 : 720;
     if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
@@ -354,8 +356,8 @@ function drawTaskbar(context, layout, regions, state) {
   context.fillStyle = "rgba(255,255,255,.1)";
   context.fillRect(0, y, width, 1);
 
-  const button = portrait ? 66 : 56;
-  const gap = portrait ? 16 : 12;
+  const button = portrait ? 56 : 56;
+  const gap = portrait ? 11 : 12;
   const items = [
     ["start", null, "⊞"],
     ["mode", "desktop", "⌂"],
@@ -378,7 +380,21 @@ function drawTaskbar(context, layout, regions, state) {
     regions.push({ action, value, rect: { x, y: y + (taskbarHeight - button) / 2, width: button, height: button }, layer: "taskbar" });
     x += button + gap;
   }
-  drawClock(context, width - (portrait ? 106 : 128), y, portrait ? 88 : 106, taskbarHeight);
+
+  const clockX = width - (portrait ? 106 : 128);
+  const clockWidth = portrait ? 88 : 106;
+  const traySize = portrait ? 54 : 52;
+  const trayGap = portrait ? 10 : 14;
+  const trayX = clockX - traySize - trayGap;
+  const trayY = y + (taskbarHeight - traySize) / 2;
+  drawSwivelTrayIcon(context, trayX, trayY, traySize);
+  regions.push({
+    action: "rotate",
+    value: null,
+    rect: { x: trayX - 5, y: trayY - 5, width: traySize + 10, height: traySize + 10 },
+    layer: "taskbar"
+  });
+  drawClock(context, clockX, y, clockWidth, taskbarHeight);
 }
 
 function drawStartMenu(context, layout, regions, state) {
@@ -765,6 +781,40 @@ function drawClock(context, x, y, width, height) {
   context.font = "600 12px Segoe UI, sans-serif";
   context.fillText(now.toLocaleDateString([], { month: "short", day: "numeric" }), x + width / 2, y + height * 0.72);
   context.textAlign = "left";
+}
+
+function drawSwivelTrayIcon(context, x, y, size) {
+  panel(context, x, y, size, size, size * 0.3, "#657cff", "rgba(255,255,255,.24)");
+  context.save();
+  context.translate(x, y);
+  context.strokeStyle = "#ffffff";
+  context.fillStyle = "#ffffff";
+  context.lineWidth = Math.max(3, size * 0.075);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  context.beginPath();
+  context.moveTo(size * 0.25, size * 0.61);
+  context.bezierCurveTo(size * 0.3, size * 0.32, size * 0.58, size * 0.25, size * 0.73, size * 0.39);
+  context.stroke();
+  context.beginPath();
+  context.moveTo(size * 0.73, size * 0.39);
+  context.lineTo(size * 0.7, size * 0.24);
+  context.lineTo(size * 0.84, size * 0.34);
+  context.closePath();
+  context.fill();
+
+  context.beginPath();
+  context.moveTo(size * 0.75, size * 0.43);
+  context.bezierCurveTo(size * 0.7, size * 0.7, size * 0.42, size * 0.77, size * 0.27, size * 0.63);
+  context.stroke();
+  context.beginPath();
+  context.moveTo(size * 0.27, size * 0.63);
+  context.lineTo(size * 0.3, size * 0.78);
+  context.lineTo(size * 0.16, size * 0.68);
+  context.closePath();
+  context.fill();
+  context.restore();
 }
 
 function drawAppIcon(context, x, y, size, glyph, label, color) {
