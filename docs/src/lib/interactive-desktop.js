@@ -13,7 +13,7 @@ const ANIMALS = [
 
 const BOARD_COLORS = ["#10131d", "#5f74ed", "#ef6a76", "#15a47b", "#f5b942"];
 
-export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
+export function createInteractiveDesktopTexture({ onRotationRequest, quality = "balanced" } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
   canvas.height = 720;
@@ -48,6 +48,27 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
 
   let layout = null;
   const regions = [];
+  let dirty = true;
+  let dirtyInterval = 0;
+  let lastPresentedAt = Number.NEGATIVE_INFINITY;
+  let lastClockMinute = -1;
+  const cadence = {
+    high: { ambient: 1000 / 30, video: 1000 / 30, gesture: 1000 / 60 },
+    balanced: { ambient: 1000 / 18, video: 1000 / 24, gesture: 1000 / 30 },
+    low: { ambient: 1000 / 12, video: 1000 / 18, gesture: 1000 / 24 }
+  }[quality] ?? { ambient: 1000 / 18, video: 1000 / 24, gesture: 1000 / 30 };
+
+  function animationInterval() {
+    if (state.mode === "video" && state.videoPlaying) return cadence.video;
+    if (state.mode === "desktop" || state.mode === "feed") return cadence.ambient;
+    return Number.POSITIVE_INFINITY;
+  }
+
+  function drawGesture() {
+    dirty = true;
+    dirtyInterval = Math.min(dirtyInterval || Number.POSITIVE_INFINITY, cadence.gesture);
+    return draw(performance.now());
+  }
 
   function setOrientation(nextOrientation) {
     const normalized = typeof nextOrientation === "boolean"
@@ -94,10 +115,23 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
     };
   }
 
-  function draw(time = performance.now()) {
+  function draw(time) {
     if (state.disposed) return;
+    resetTextureTransform();
+    const force = !Number.isFinite(time);
+    const frameTime = force ? performance.now() : time;
+    const clockMinute = Math.floor(Date.now() / 60000);
+    if (clockMinute !== lastClockMinute) {
+      dirty = true;
+      dirtyInterval = 0;
+    }
+    const elapsed = frameTime - lastPresentedAt;
+    const animationDue = elapsed >= animationInterval();
+    const dirtyDue = dirty && elapsed >= dirtyInterval;
+    if (!force && !animationDue && !dirtyDue) return false;
+
     resizeCanvas();
-    state.lastDrawTime = Number.isFinite(time) ? time : performance.now();
+    state.lastDrawTime = frameTime;
     layout = computeLayout();
     regions.length = 0;
 
@@ -111,6 +145,11 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
     drawGlass(context, layout);
     presentFrame();
     texture.needsUpdate = true;
+    dirty = false;
+    dirtyInterval = 0;
+    lastPresentedAt = frameTime;
+    lastClockMinute = clockMinute;
+    return true;
   }
 
   function presentFrame() {
@@ -124,10 +163,13 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
     }
     presentationContext.drawImage(layoutCanvas, 0, 0);
     presentationContext.setTransform(1, 0, 0, 1, 0, 0);
+  }
 
+  function resetTextureTransform() {
     // The presentation canvas already contains the correctly oriented frame.
     // Keep Three's texture transform neutral even if the host previously used
-    // texture rotation for orientation.
+    // texture rotation for orientation. This must also run when a host-frame
+    // redraw is skipped so the legacy transform cannot reach WebGL.
     texture.offset.set(0, 0);
     texture.repeat.set(1, 1);
     texture.center.set(0.5, 0.5);
@@ -223,7 +265,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
 
     if (state.activePointer.type === "board") {
       appendBoardPoint(state.activePointer.stroke, point, state.activePointer.rect);
-      draw();
+      drawGesture();
       return { handled: true, action: "board-draw" };
     }
 
@@ -232,7 +274,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
       state.activePointer.moved += Math.abs(delta);
       state.feedOffset -= delta;
       state.activePointer.lastY = point.y;
-      draw();
+      drawGesture();
       return { handled: true, action: "feed-scroll" };
     }
     return { handled: false };
@@ -272,7 +314,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
     const feedRegion = regions.find((region) => region.action === "feed-drag");
     if (!feedRegion || !contains(feedRegion.rect, point)) return { handled: false };
     state.feedOffset += clampNumber(deltaY, -240, 240) * 0.8;
-    draw();
+    drawGesture();
     return { handled: true, action: "feed-scroll" };
   }
 

@@ -160,6 +160,50 @@ function createLensFlareTexture() {
   return texture;
 }
 
+function selectRenderQuality() {
+  const requestedQuality = new URLSearchParams(window.location.search).get("quality");
+  if (["high", "balanced", "low"].includes(requestedQuality)) return requestedQuality;
+
+  const memory = Number(navigator.deviceMemory) || 0;
+  const cores = Number(navigator.hardwareConcurrency) || 0;
+
+  if ((memory > 0 && memory <= 4) || (cores > 0 && cores <= 4)) return "low";
+  return "balanced";
+}
+
+const renderQualityName = selectRenderQuality();
+const renderQualityProfiles = {
+  high: {
+    dprCap: 1.5,
+    maxPixels: 4_000_000,
+    pendantShadowSize: window.matchMedia("(max-width: 860px)").matches ? 512 : 1024,
+    studioShadow: true,
+    floorBulbTransmission: 0.35
+  },
+  balanced: {
+    dprCap: 1.25,
+    maxPixels: 2_500_000,
+    pendantShadowSize: 512,
+    studioShadow: false,
+    floorBulbTransmission: 0
+  },
+  low: {
+    dprCap: 1,
+    maxPixels: 1_500_000,
+    pendantShadowSize: 256,
+    studioShadow: false,
+    floorBulbTransmission: 0
+  }
+};
+const renderQuality = renderQualityProfiles[renderQualityName];
+demo.dataset.renderQuality = renderQualityName;
+
+function getEffectivePixelRatio(width, height) {
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  const pixelBudgetRatio = Math.sqrt(renderQuality.maxPixels / Math.max(1, width * height));
+  return Math.min(devicePixelRatio, renderQuality.dprCap, pixelBudgetRatio);
+}
+
 try {
   renderer = new THREE.WebGLRenderer({
     canvas,
@@ -167,7 +211,7 @@ try {
     antialias: true,
     powerPreference: "high-performance"
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.65));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality.dprCap));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.94;
@@ -187,10 +231,7 @@ try {
   const pendantLight = new THREE.SpotLight(0xffb76e, 92, 22, Math.PI / 3.35, 0.56, 1.55);
   pendantLight.target = pendantLightTarget;
   pendantLight.castShadow = true;
-  pendantLight.shadow.mapSize.set(
-    window.matchMedia("(max-width: 860px)").matches ? 512 : 1024,
-    window.matchMedia("(max-width: 860px)").matches ? 512 : 1024
-  );
+  pendantLight.shadow.mapSize.set(renderQuality.pendantShadowSize, renderQuality.pendantShadowSize);
   pendantLight.shadow.camera.near = 0.5;
   pendantLight.shadow.camera.far = 22;
   pendantLight.shadow.bias = -0.00035;
@@ -204,7 +245,7 @@ try {
   const studioLight = new THREE.SpotLight(0xc9ddff, 108, 25, Math.PI / 4.2, 0.48, 1.7);
   studioLight.position.set(1.45, -2.39, -3.9);
   studioLight.target = studioLightTarget;
-  studioLight.castShadow = true;
+  studioLight.castShadow = renderQuality.studioShadow;
   studioLight.shadow.mapSize.set(512, 512);
   studioLight.shadow.camera.near = 0.45;
   studioLight.shadow.camera.far = 22;
@@ -367,8 +408,8 @@ try {
       emissive: 0x77aaff,
       emissiveIntensity: floorLightLevels.glassEmissive,
       roughness: 0.12,
-      transmission: 0.35,
-      thickness: 0.12,
+      transmission: renderQuality.floorBulbTransmission,
+      thickness: renderQuality.floorBulbTransmission > 0 ? 0.12 : 0,
       transparent: true,
       opacity: 0.68,
       depthWrite: false
@@ -680,6 +721,7 @@ try {
   display.add(frame);
 
   const ui = createInteractiveDesktopTexture({
+    quality: renderQualityName,
     onRotationRequest: () => {
       const next = contentTarget > 0.5 ? 0 : 1;
       contentTarget = next;
@@ -2144,6 +2186,7 @@ try {
     const width = Math.max(1, Math.floor(rect.width));
     const height = Math.max(1, Math.floor(rect.height));
     const aspect = width / height;
+    renderer.setPixelRatio(getEffectivePixelRatio(width, height));
     const verticalHalf = 6.35;
     camera.left = -verticalHalf * aspect;
     camera.right = verticalHalf * aspect;
