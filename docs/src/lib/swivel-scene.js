@@ -1064,8 +1064,8 @@ try {
       ui.setOrientation(nextOrientation);
     }
     demo.dataset.orientation = nextOrientation;
-    ui.texture.center.set(0.5, 0.5);
-    ui.texture.rotation = nextOrientation === "portrait" ? Math.PI / 2 : 0;
+    // The desktop owns a fixed 16:9 presentation texture and composites its
+    // responsive portrait layout into it without scaling.
   }
 
   function restartGuide(message = "Watch once. Then the screen is yours.") {

@@ -15,8 +15,14 @@ const BOARD_COLORS = ["#10131d", "#5f74ed", "#ef6a76", "#15a47b", "#f5b942"];
 
 export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
   const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Interactive desktop requires a 2D canvas context.");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const presentationContext = canvas.getContext("2d");
+  const layoutCanvas = document.createElement("canvas");
+  const context = layoutCanvas.getContext("2d");
+  if (!presentationContext || !context) {
+    throw new Error("Interactive desktop requires a 2D canvas context.");
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -64,21 +70,17 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
 
   function resizeCanvas() {
     const portrait = state.orientation === "portrait";
-    // Match the modeled 16:9 glass exactly. Portrait uses the reciprocal
-    // dimensions so circles and type keep the same proportions after turning.
     const nextWidth = portrait ? 720 : 1280;
     const nextHeight = portrait ? 1280 : 720;
-    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-      canvas.width = nextWidth;
-      canvas.height = nextHeight;
-      texture.image = canvas;
-      texture.needsUpdate = true;
+    if (layoutCanvas.width !== nextWidth || layoutCanvas.height !== nextHeight) {
+      layoutCanvas.width = nextWidth;
+      layoutCanvas.height = nextHeight;
     }
   }
 
   function computeLayout() {
-    const width = canvas.width;
-    const height = canvas.height;
+    const width = layoutCanvas.width;
+    const height = layoutCanvas.height;
     const portrait = state.orientation === "portrait";
     const taskbarHeight = portrait ? 94 : 76;
     const content = { x: 0, y: 0, width, height: height - taskbarHeight };
@@ -107,7 +109,30 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
     drawTaskbar(context, layout, regions, state);
     if (state.startOpen) drawStartMenu(context, layout, regions, state);
     drawGlass(context, layout);
+    presentFrame();
     texture.needsUpdate = true;
+  }
+
+  function presentFrame() {
+    presentationContext.setTransform(1, 0, 0, 1, 0, 0);
+    presentationContext.clearRect(0, 0, canvas.width, canvas.height);
+    if (state.orientation === "portrait") {
+      // Rotate the 720 x 1280 responsive layout into the stable 1280 x 720
+      // presentation surface without scaling either axis.
+      presentationContext.translate(0, canvas.height);
+      presentationContext.rotate(-Math.PI / 2);
+    }
+    presentationContext.drawImage(layoutCanvas, 0, 0);
+    presentationContext.setTransform(1, 0, 0, 1, 0, 0);
+
+    // The presentation canvas already contains the correctly oriented frame.
+    // Keep Three's texture transform neutral even if the host previously used
+    // texture rotation for orientation.
+    texture.offset.set(0, 0);
+    texture.repeat.set(1, 1);
+    texture.center.set(0.5, 0.5);
+    texture.rotation = 0;
+    texture.updateMatrix();
   }
 
   function ensureLayout() {
@@ -252,11 +277,13 @@ export function createInteractiveDesktopTexture({ onRotationRequest } = {}) {
   }
 
   function uvToCanvas(uv, explicitV) {
-    const u = typeof uv === "number" ? uv : (uv?.u ?? uv?.x ?? 0);
-    const v = typeof uv === "number" ? explicitV : (uv?.v ?? uv?.y ?? 0);
+    const rawU = typeof uv === "number" ? uv : (uv?.u ?? uv?.x ?? 0);
+    const rawV = typeof uv === "number" ? explicitV : (uv?.v ?? uv?.y ?? 0);
+    const u = state.orientation === "portrait" ? rawV : rawU;
+    const v = state.orientation === "portrait" ? 1 - rawU : rawV;
     return {
-      x: clampNumber(u, 0, 1) * canvas.width,
-      y: (1 - clampNumber(v, 0, 1)) * canvas.height
+      x: clampNumber(u, 0, 1) * layoutCanvas.width,
+      y: (1 - clampNumber(v, 0, 1)) * layoutCanvas.height
     };
   }
 
