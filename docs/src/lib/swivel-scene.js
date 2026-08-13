@@ -428,7 +428,7 @@ try {
   const [buttonTexture, pointerTexture, gripTexture] = await Promise.all([
     loader.loadAsync("assets/3d/rotation-button.png?v=3"),
     loader.loadAsync("assets/3d/pointer-hand.png"),
-    loader.loadAsync("assets/3d/grip-hand.png")
+    loader.loadAsync("assets/3d/grip-hand-v2.png")
   ]);
   for (const texture of [buttonTexture, pointerTexture, gripTexture]) {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -707,19 +707,50 @@ try {
     };
   }
 
-  function updateDragInteraction() {
+  function getDragGeometry() {
     if (!dragState) return;
     const demoRect = demo.getBoundingClientRect();
     const pointerX = dragState.pointerX - demoRect.left;
     const pointerY = dragState.pointerY - demoRect.top;
-    const currentGripPoint = projectGripToDemo(dragState.gripLocal);
+    const gripPoint = projectGripToDemo(dragState.gripLocal);
+    const centerPoint = projectGripToDemo(new THREE.Vector3());
+    return { pointerX, pointerY, gripPoint, centerPoint };
+  }
+
+  function applyDragForce(deltaSeconds) {
+    const geometry = getDragGeometry();
+    if (!geometry) return;
+    const { pointerX, pointerY, gripPoint, centerPoint } = geometry;
+    const radialX = gripPoint.x - centerPoint.x;
+    const radialY = gripPoint.y - centerPoint.y;
+    const forceX = pointerX - gripPoint.x;
+    const forceY = pointerY - gripPoint.y;
+    const radialLength = Math.max(1, Math.hypot(radialX, radialY));
+    const tangentialForce = (radialX * forceY - radialY * forceX) / radialLength;
+    const forward = dragState.destination > dragState.startProgress;
+    const forceTowardDestination = (forward ? 1 : -1) * tangentialForce;
+    const effectiveForce = Math.max(0, forceTowardDestination - 6);
+    const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
+    const progressDelta = effectiveForce / dragDistance * deltaSeconds * 9.5;
+    const nextProgress = physicalProgress + (forward ? 1 : -1) * progressDelta;
+    physicalProgress = clamp(
+      nextProgress,
+      Math.min(dragState.startProgress, dragState.destination),
+      Math.max(dragState.startProgress, dragState.destination));
+    physicalTarget = physicalProgress;
+  }
+
+  function updateDragVisual() {
+    const geometry = getDragGeometry();
+    if (!geometry) return;
+    const { pointerX, pointerY, gripPoint } = geometry;
     if (cursorElement) {
-      cursorElement.style.left = `${currentGripPoint.x}px`;
-      cursorElement.style.top = `${currentGripPoint.y}px`;
+      cursorElement.style.left = `${gripPoint.x}px`;
+      cursorElement.style.top = `${gripPoint.y}px`;
     }
     if (forceLine) {
-      forceLine.setAttribute("x1", String(currentGripPoint.x));
-      forceLine.setAttribute("y1", String(currentGripPoint.y));
+      forceLine.setAttribute("x1", String(gripPoint.x));
+      forceLine.setAttribute("y1", String(gripPoint.y));
       forceLine.setAttribute("x2", String(pointerX));
       forceLine.setAttribute("y2", String(pointerY));
     }
@@ -757,7 +788,7 @@ try {
     cursorElement.style.left = `${event.clientX - demoRect.left}px`;
     cursorElement.style.top = `${event.clientY - demoRect.top}px`;
     cursorElement.src = findAction(event) === "edge"
-      ? "assets/3d/grip-hand.png"
+      ? "assets/3d/grip-hand-v2.png"
       : "assets/3d/pointer-hand.png";
   }
 
@@ -777,25 +808,8 @@ try {
     }
 
     if (dragState) {
-      const stepX = event.clientX - dragState.pointerX;
-      const stepY = event.clientY - dragState.pointerY;
-      const forward = dragState.destination > dragState.startProgress;
-      const intendedStep = forward
-        ? Math.max(-stepX, stepY)
-        : Math.max(stepX, -stepY);
-      const stepDistance = Math.hypot(stepX, stepY);
-      const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
-      dragState.travel = clamp(
-        dragState.travel + (intendedStep > 0 ? stepDistance : -stepDistance),
-        0,
-        dragDistance);
       dragState.pointerX = event.clientX;
       dragState.pointerY = event.clientY;
-      physicalProgress = clamp(mix(
-        dragState.startProgress,
-        dragState.destination,
-        dragState.travel / dragDistance));
-      physicalTarget = physicalProgress;
       updateInteractiveCaption();
       return;
     }
@@ -803,7 +817,7 @@ try {
     const action = findAction(event);
     if (cursorElement) {
       cursorElement.src = action === "edge"
-        ? "assets/3d/grip-hand.png"
+        ? "assets/3d/grip-hand-v2.png"
         : "assets/3d/pointer-hand.png";
     }
   });
@@ -823,10 +837,9 @@ try {
         destination,
         pointerX: event.clientX,
         pointerY: event.clientY,
-        travel: 0,
         gripLocal: display.worldToLocal(edgeHit.point.clone())
       };
-      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
+      if (cursorElement) cursorElement.src = "assets/3d/grip-hand-v2.png";
       demo.classList.add("is-dragging");
     }
     try {
@@ -903,7 +916,8 @@ try {
 
     if (!guided) {
       const ease = 1 - Math.exp(-deltaSeconds * 8.5);
-      if (!dragState) physicalProgress = mix(physicalProgress, physicalTarget, ease);
+      if (dragState) applyDragForce(deltaSeconds);
+      else physicalProgress = mix(physicalProgress, physicalTarget, ease);
       contentProgress = mix(contentProgress, contentTarget, ease);
       if (Math.abs(physicalProgress - physicalTarget) < 0.001) physicalProgress = physicalTarget;
       if (Math.abs(contentProgress - contentTarget) < 0.001) contentProgress = contentTarget;
@@ -923,7 +937,7 @@ try {
       const bubbleProgress = bubbleVisible ? clamp((time - bubbleShownAt) / 4200) : 0;
       const settingsOpacity = settingsVisibleUntil > time ? 1 : 0;
       display.rotation.z = mix(0, -Math.PI / 2, physicalProgress);
-      if (dragState) updateDragInteraction();
+      if (dragState) updateDragVisual();
       ui.draw(mix(0, Math.PI / 2, contentProgress), currentMode);
       bubbleGroup.rotation.z = -display.rotation.z;
       bubbleMaterial.opacity = bubbleVisible ? 1 : 0;

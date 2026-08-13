@@ -422,8 +422,8 @@ h1 em {
 }
 
 .demo.is-dragging .demo-cursor {
-  width: 106px;
-  transform: translate(-30%, -30%) rotate(-16deg);
+  width: 112px;
+  transform: translate(-30%, -66%) rotate(-12deg);
 }
 
 .webgl-fallback {
