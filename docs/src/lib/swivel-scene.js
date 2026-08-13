@@ -727,17 +727,13 @@ try {
     const forceY = pointerY - gripPoint.y;
     const radialLength = Math.max(1, Math.hypot(radialX, radialY));
     const tangentialForce = (radialX * forceY - radialY * forceX) / radialLength;
-    const forward = dragState.destination > dragState.startProgress;
-    const forceTowardDestination = (forward ? 1 : -1) * tangentialForce;
-    const effectiveForce = Math.max(0, forceTowardDestination - 6);
+    const effectiveForce = Math.sign(tangentialForce)
+      * Math.max(0, Math.abs(tangentialForce) - 6);
     const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
-    const progressDelta = effectiveForce / dragDistance * deltaSeconds * 9.5;
-    const nextProgress = physicalProgress + (forward ? 1 : -1) * progressDelta;
-    physicalProgress = clamp(
-      nextProgress,
-      Math.min(dragState.startProgress, dragState.destination),
-      Math.max(dragState.startProgress, dragState.destination));
+    const velocity = clamp(effectiveForce / dragDistance * 9.5, -2.75, 2.75);
+    physicalProgress = clamp(physicalProgress + velocity * deltaSeconds);
     physicalTarget = physicalProgress;
+    dragState.velocity = velocity;
   }
 
   function updateDragVisual() {
@@ -829,14 +825,13 @@ try {
     pressedAt = performance.now();
     bubbleHoldTriggered = false;
     if (action === "edge") {
-      const destination = physicalProgress >= 0.5 ? 0 : 1;
       const edgeHit = raycaster.intersectObjects(edgeHits, false)[0];
       display.updateMatrixWorld(true);
       dragState = {
         startProgress: physicalProgress,
-        destination,
         pointerX: event.clientX,
         pointerY: event.clientY,
+        velocity: 0,
         gripLocal: display.worldToLocal(edgeHit.point.clone())
       };
       if (cursorElement) cursorElement.src = "assets/3d/grip-hand-v2.png";
@@ -853,11 +848,11 @@ try {
     noteActivity();
     const now = performance.now();
     if (dragState) {
-      const fullDistance = Math.max(0.001, Math.abs(dragState.destination - dragState.startProgress));
-      const travelled = Math.abs(physicalProgress - dragState.startProgress) / fullDistance;
-      physicalTarget = travelled >= 0.85
-        ? dragState.destination
-        : dragState.startProgress;
+      const releaseProgress = clamp(physicalProgress + dragState.velocity * 0.1);
+      const startedPortrait = dragState.startProgress >= 0.5;
+      physicalTarget = startedPortrait
+        ? (releaseProgress <= 0.15 ? 0 : 1)
+        : (releaseProgress >= 0.85 ? 1 : 0);
       dragState = null;
       demo.classList.remove("is-dragging");
       releaseDragCursor(event);
