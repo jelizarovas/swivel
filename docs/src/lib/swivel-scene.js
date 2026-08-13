@@ -486,12 +486,23 @@ try {
   trayHit.userData.action = "trigger";
   display.add(trayHit);
 
-  const rightEdgeHit = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 3.42, 0.72),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
-  rightEdgeHit.position.set(2.8, 0, 0.05);
-  rightEdgeHit.userData.action = "edge";
-  display.add(rightEdgeHit);
+  const edgeHitMaterial = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0.001,
+    depthWrite: false
+  });
+  const edgeHits = [
+    [new THREE.BoxGeometry(0.42, 3.42, 0.72), 2.82, 0],
+    [new THREE.BoxGeometry(0.42, 3.42, 0.72), -2.82, 0],
+    [new THREE.BoxGeometry(5.46, 0.36, 0.72), 0, 1.67],
+    [new THREE.BoxGeometry(5.46, 0.36, 0.72), 0, -1.67]
+  ].map(([geometry, x, y]) => {
+    const hit = new THREE.Mesh(geometry, edgeHitMaterial);
+    hit.position.set(x, y, 0.05);
+    hit.userData.action = "edge";
+    display.add(hit);
+    return hit;
+  });
 
   const pointerMaterial = new THREE.SpriteMaterial({
     map: pointerTexture,
@@ -674,18 +685,12 @@ try {
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(rayPosition, camera);
-    const hits = raycaster.intersectObjects([bubble, readerHit, trayHit, rightEdgeHit], false);
-    for (const hit of hits) {
-      const action = hit.object.userData.action;
-      if (action === "bubble" && bubbleVisible) return action;
-      if (action === "trigger") {
-        if (currentMode === "monitor" && hit.object === trayHit) return action;
-        if (currentMode !== "monitor" && hit.object === readerHit) return action;
-      }
-      if (action === "edge"
-          && currentMode !== "monitor"
-          && Math.abs(contentTarget - physicalProgress) > 0.02) return action;
+    if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
+    if (currentMode === "monitor") {
+      return raycaster.intersectObject(trayHit, false).length > 0 ? "trigger" : null;
     }
+    if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
+    if (raycaster.intersectObjects(edgeHits, false).length > 0) return "edge";
     return null;
   }
 
@@ -731,9 +736,10 @@ try {
       const dx = event.clientX - dragState.startX;
       const dy = event.clientY - dragState.startY;
       const forward = dragState.destination > dragState.startProgress;
-      const directionX = forward ? -0.45 : 0.45;
-      const directionY = forward ? 0.89 : -0.89;
-      const projectedDistance = Math.max(0, dx * directionX + dy * directionY);
+      const intendedTravel = forward
+        ? Math.max(-dx, dy)
+        : Math.max(dx, -dy);
+      const projectedDistance = intendedTravel > 0 ? Math.hypot(dx, dy) : 0;
       const travel = clamp(projectedDistance / dragDistance);
       physicalProgress = clamp(
         mix(dragState.startProgress, dragState.destination, travel));
@@ -757,11 +763,12 @@ try {
     pressedAt = performance.now();
     bubbleHoldTriggered = false;
     if (action === "edge") {
+      const destination = physicalProgress >= 0.5 ? 0 : 1;
       dragState = {
         startX: event.clientX,
         startY: event.clientY,
         startProgress: physicalProgress,
-        destination: contentTarget
+        destination
       };
       demo.classList.add("is-dragging");
     }
