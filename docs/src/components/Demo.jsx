@@ -43,6 +43,10 @@ export function Demo() {
       </div>
       <img className="webgl-fallback" src={`${base}assets/animation/frame-landscape.webp`} width="960" height="960" alt="" aria-hidden="true" />
       <canvas id="swivel-scene" aria-hidden="true" />
+      <svg className="drag-force-vector" aria-hidden="true">
+        <line className="drag-force-line" />
+        <circle className="drag-force-end" r="8" />
+      </svg>
       <div className="scene-shine" aria-hidden="true" />
       <img className="demo-cursor" src={`${base}assets/3d/pointer-hand.png`} alt="" aria-hidden="true" />
     </figure>

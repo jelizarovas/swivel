@@ -5,6 +5,8 @@ const demo = root.matches?.(".demo") ? root : root.querySelector(".demo");
 const canvas = demo?.querySelector("#swivel-scene");
 const modeButtons = [...(demo?.querySelectorAll("[data-demo-mode]") ?? [])];
 const cursorElement = demo?.querySelector(".demo-cursor");
+const forceLine = demo?.querySelector(".drag-force-line");
+const forceEnd = demo?.querySelector(".drag-force-end");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const requestedTime = Number.parseFloat(new URLSearchParams(window.location.search).get("t"));
 const frozenTime = Number.isFinite(requestedTime) ? requestedTime : null;
@@ -694,6 +696,39 @@ try {
     return null;
   }
 
+  function projectGripToDemo(localPoint) {
+    display.updateMatrixWorld(true);
+    const projected = display.localToWorld(localPoint.clone()).project(camera);
+    const canvasRect = canvas.getBoundingClientRect();
+    const demoRect = demo.getBoundingClientRect();
+    return {
+      x: canvasRect.left - demoRect.left + ((projected.x + 1) * 0.5) * canvasRect.width,
+      y: canvasRect.top - demoRect.top + ((1 - projected.y) * 0.5) * canvasRect.height
+    };
+  }
+
+  function updateDragInteraction() {
+    if (!dragState) return;
+    const demoRect = demo.getBoundingClientRect();
+    const pointerX = dragState.pointerX - demoRect.left;
+    const pointerY = dragState.pointerY - demoRect.top;
+    const currentGripPoint = projectGripToDemo(dragState.gripLocal);
+    if (cursorElement) {
+      cursorElement.style.left = `${currentGripPoint.x}px`;
+      cursorElement.style.top = `${currentGripPoint.y}px`;
+    }
+    if (forceLine) {
+      forceLine.setAttribute("x1", String(currentGripPoint.x));
+      forceLine.setAttribute("y1", String(currentGripPoint.y));
+      forceLine.setAttribute("x2", String(pointerX));
+      forceLine.setAttribute("y2", String(pointerY));
+    }
+    if (forceEnd) {
+      forceEnd.setAttribute("cx", String(pointerX));
+      forceEnd.setAttribute("cy", String(pointerY));
+    }
+  }
+
   function updateInteractiveCaption() {
     if (dragState) setPhase("dragging", "dragging");
     else if (Math.abs(contentTarget - physicalProgress) > 0.025) setPhase("ready-to-swivel", "ready");
@@ -716,6 +751,16 @@ try {
     updateInteractiveCaption();
   }
 
+  function releaseDragCursor(event) {
+    if (!cursorElement) return;
+    const demoRect = demo.getBoundingClientRect();
+    cursorElement.style.left = `${event.clientX - demoRect.left}px`;
+    cursorElement.style.top = `${event.clientY - demoRect.top}px`;
+    cursorElement.src = findAction(event) === "edge"
+      ? "assets/3d/grip-hand.png"
+      : "assets/3d/pointer-hand.png";
+  }
+
   canvas.addEventListener("pointerenter", () => {
     if (!guided) demo.classList.add("pointer-inside");
   });
@@ -726,23 +771,30 @@ try {
     if (guided) return;
     noteActivity();
     const demoRect = demo.getBoundingClientRect();
-    if (cursorElement) {
+    if (cursorElement && !dragState) {
       cursorElement.style.left = `${event.clientX - demoRect.left}px`;
       cursorElement.style.top = `${event.clientY - demoRect.top}px`;
     }
 
     if (dragState) {
-      const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
-      const dx = event.clientX - dragState.startX;
-      const dy = event.clientY - dragState.startY;
+      const stepX = event.clientX - dragState.pointerX;
+      const stepY = event.clientY - dragState.pointerY;
       const forward = dragState.destination > dragState.startProgress;
-      const intendedTravel = forward
-        ? Math.max(-dx, dy)
-        : Math.max(dx, -dy);
-      const projectedDistance = intendedTravel > 0 ? Math.hypot(dx, dy) : 0;
-      const travel = clamp(projectedDistance / dragDistance);
-      physicalProgress = clamp(
-        mix(dragState.startProgress, dragState.destination, travel));
+      const intendedStep = forward
+        ? Math.max(-stepX, stepY)
+        : Math.max(stepX, -stepY);
+      const stepDistance = Math.hypot(stepX, stepY);
+      const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
+      dragState.travel = clamp(
+        dragState.travel + (intendedStep > 0 ? stepDistance : -stepDistance),
+        0,
+        dragDistance);
+      dragState.pointerX = event.clientX;
+      dragState.pointerY = event.clientY;
+      physicalProgress = clamp(mix(
+        dragState.startProgress,
+        dragState.destination,
+        dragState.travel / dragDistance));
       physicalTarget = physicalProgress;
       updateInteractiveCaption();
       return;
@@ -764,12 +816,17 @@ try {
     bubbleHoldTriggered = false;
     if (action === "edge") {
       const destination = physicalProgress >= 0.5 ? 0 : 1;
+      const edgeHit = raycaster.intersectObjects(edgeHits, false)[0];
+      display.updateMatrixWorld(true);
       dragState = {
-        startX: event.clientX,
-        startY: event.clientY,
         startProgress: physicalProgress,
-        destination
+        destination,
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+        travel: 0,
+        gripLocal: display.worldToLocal(edgeHit.point.clone())
       };
+      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
       demo.classList.add("is-dragging");
     }
     try {
@@ -790,6 +847,7 @@ try {
         : dragState.startProgress;
       dragState = null;
       demo.classList.remove("is-dragging");
+      releaseDragCursor(event);
       updateInteractiveCaption();
     } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
       if (currentMode === "monitor") {
@@ -819,6 +877,7 @@ try {
     }
     pressedAction = null;
     demo.classList.remove("is-dragging");
+    releaseDragCursor(event);
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   });
 
@@ -864,6 +923,7 @@ try {
       const bubbleProgress = bubbleVisible ? clamp((time - bubbleShownAt) / 4200) : 0;
       const settingsOpacity = settingsVisibleUntil > time ? 1 : 0;
       display.rotation.z = mix(0, -Math.PI / 2, physicalProgress);
+      if (dragState) updateDragInteraction();
       ui.draw(mix(0, Math.PI / 2, contentProgress), currentMode);
       bubbleGroup.rotation.z = -display.rotation.z;
       bubbleMaterial.opacity = bubbleVisible ? 1 : 0;
