@@ -420,6 +420,12 @@ h1 em {
   transform-origin: 28% 18%;
 }
 
+.demo-cursor.is-grip {
+  width: 112px;
+  transform: translate(-30%, -66%) rotate(-12deg);
+  transform-origin: 30% 66%;
+}
+
 .demo-grip {
   position: absolute;
   z-index: 12;

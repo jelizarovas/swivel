@@ -62,6 +62,30 @@ function roundedSolid(width, height, radius, depth, bevel = 0.04) {
   return geometry;
 }
 
+function roundedRingSolid(
+  width,
+  height,
+  radius,
+  innerWidth,
+  innerHeight,
+  innerRadius,
+  depth,
+  bevel = 0.02
+) {
+  const shape = roundedRectShape(width, height, radius);
+  shape.holes.push(roundedRectShape(innerWidth, innerHeight, innerRadius));
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    curveSegments: 12,
+    bevelEnabled: bevel > 0,
+    bevelSegments: 2,
+    bevelSize: bevel,
+    bevelThickness: bevel
+  });
+  geometry.translate(0, 0, -depth / 2);
+  return geometry;
+}
+
 function material(color, roughness = 0.55, metalness = 0) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
@@ -614,23 +638,19 @@ try {
   trayHit.userData.action = "trigger";
   display.add(trayHit);
 
-  const edgeHitMaterial = new THREE.MeshBasicMaterial({
-    transparent: true,
-    opacity: 0.001,
-    depthWrite: false
-  });
-  const edgeHits = [
-    [new THREE.BoxGeometry(0.42, 3.42, 0.72), 2.82, 0],
-    [new THREE.BoxGeometry(0.42, 3.42, 0.72), -2.82, 0],
-    [new THREE.BoxGeometry(5.46, 0.36, 0.72), 0, 1.67],
-    [new THREE.BoxGeometry(5.46, 0.36, 0.72), 0, -1.67]
-  ].map(([geometry, x, y]) => {
-    const hit = new THREE.Mesh(geometry, edgeHitMaterial);
-    hit.position.set(x, y, 0.05);
-    hit.userData.action = "edge";
-    display.add(hit);
-    return hit;
-  });
+  // A single continuous bezel target prevents overlapping edge volumes from
+  // choosing a different hidden edge at oblique podium angles.
+  const edgeHit = new THREE.Mesh(
+    roundedRingSolid(6.12, 3.74, 0.34, 5.25, 2.87, 0.08, 0.52, 0.025),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    }));
+  edgeHit.position.z = 0;
+  edgeHit.userData.action = "edge";
+  display.add(edgeHit);
 
   const pointerMaterial = new THREE.SpriteMaterial({
     map: pointerTexture,
@@ -719,6 +739,7 @@ try {
   let bubbleShownAt = 0;
   let settingsVisibleUntil = 0;
   let pressedAction = null;
+  let pressedPointerId = null;
   let pressedAt = 0;
   let bubbleHoldTriggered = false;
   let dragState = null;
@@ -774,6 +795,8 @@ try {
     contentTarget = 0;
     bubbleVisible = false;
     settingsVisibleUntil = 0;
+    pressedAction = null;
+    pressedPointerId = null;
     dragState = null;
     orbitState = null;
     sceneRig.rotation.y = 0;
@@ -811,19 +834,37 @@ try {
     lastActivityAt = performance.now();
   }
 
-  function findAction(event) {
+  function syncInteractionMatrices() {
+    scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+  }
+
+  function setRayFromEvent(event) {
     const rect = canvas.getBoundingClientRect();
     rayPosition.set(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    syncInteractionMatrices();
     raycaster.setFromCamera(rayPosition, camera);
+  }
+
+  function getEdgePick(event) {
+    setRayFromEvent(event);
+    const hit = raycaster.intersectObject(edgeHit, false)[0];
+    if (!hit) return null;
+    return { localPoint: display.worldToLocal(hit.point.clone()) };
+  }
+
+  function findAction(event) {
+    setRayFromEvent(event);
     if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
     if (currentMode === "monitor") {
       if (raycaster.intersectObject(trayHit, false).length > 0) return "trigger";
+      if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
       return raycaster.intersectObject(stage, false).length > 0 ? "orbit" : null;
     }
     if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
-    if (raycaster.intersectObjects(edgeHits, false).length > 0) return "edge";
+    if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
     if (currentMode !== "wall" && raycaster.intersectObject(stage, false).length > 0) return "orbit";
     return null;
   }
@@ -842,23 +883,46 @@ try {
   function getDragGeometry() {
     if (!dragState) return;
     const demoRect = demo.getBoundingClientRect();
-    const pointerX = dragState.pointerX - demoRect.left;
-    const pointerY = dragState.pointerY - demoRect.top;
+    const rawPointerX = dragState.pointerX - demoRect.left;
+    const rawPointerY = dragState.pointerY - demoRect.top;
+    const pointerX = rawPointerX - dragState.pointerOffsetX;
+    const pointerY = rawPointerY - dragState.pointerOffsetY;
     const gripPoint = projectGripToDemo(dragState.gripLocal);
-    const centerPoint = projectGripToDemo(new THREE.Vector3());
-    return { pointerX, pointerY, gripPoint, centerPoint };
+    return { pointerX, pointerY, rawPointerX, rawPointerY, gripPoint };
+  }
+
+  function getGripProgressTangent(localPoint) {
+    const previousRotation = display.rotation.z;
+    const lowProgress = Math.max(0, physicalProgress - 0.003);
+    const highProgress = Math.min(1, physicalProgress + 0.003);
+
+    let before;
+    let after;
+    try {
+      display.rotation.z = mix(0, -Math.PI / 2, lowProgress);
+      before = projectGripToDemo(localPoint);
+      display.rotation.z = mix(0, -Math.PI / 2, highProgress);
+      after = projectGripToDemo(localPoint);
+    } finally {
+      display.rotation.z = previousRotation;
+      display.updateMatrixWorld(true);
+    }
+
+    const tangentX = after.x - before.x;
+    const tangentY = after.y - before.y;
+    const tangentLength = Math.hypot(tangentX, tangentY);
+    if (tangentLength < 0.01) return null;
+    return { x: tangentX / tangentLength, y: tangentY / tangentLength };
   }
 
   function applyDragForce(deltaSeconds) {
     const geometry = getDragGeometry();
     if (!geometry) return;
-    const { pointerX, pointerY, gripPoint, centerPoint } = geometry;
-    const radialX = gripPoint.x - centerPoint.x;
-    const radialY = gripPoint.y - centerPoint.y;
+    const { pointerX, pointerY, gripPoint } = geometry;
     const forceX = pointerX - gripPoint.x;
     const forceY = pointerY - gripPoint.y;
-    const radialLength = Math.max(1, Math.hypot(radialX, radialY));
-    const tangentialForce = (radialX * forceY - radialY * forceX) / radialLength;
+    const tangent = getGripProgressTangent(dragState.gripLocal);
+    const tangentialForce = tangent ? forceX * tangent.x + forceY * tangent.y : 0;
     dragState.blocked = (physicalProgress <= 0.001 && tangentialForce < -6)
       || (physicalProgress >= 0.999 && tangentialForce > 6);
     const effectiveForce = Math.sign(tangentialForce)
@@ -873,7 +937,7 @@ try {
   function updateDragVisual() {
     const geometry = getDragGeometry();
     if (!geometry) return;
-    const { pointerX, pointerY, gripPoint } = geometry;
+    const { rawPointerX, rawPointerY, gripPoint } = geometry;
     forceVector?.classList.toggle("is-blocked", Boolean(dragState.blocked));
     if (gripElement) {
       gripElement.style.left = `${gripPoint.x}px`;
@@ -882,12 +946,12 @@ try {
     if (forceLine) {
       forceLine.setAttribute("x1", String(gripPoint.x));
       forceLine.setAttribute("y1", String(gripPoint.y));
-      forceLine.setAttribute("x2", String(pointerX));
-      forceLine.setAttribute("y2", String(pointerY));
+      forceLine.setAttribute("x2", String(rawPointerX));
+      forceLine.setAttribute("y2", String(rawPointerY));
     }
     if (forceEnd) {
-      forceEnd.setAttribute("cx", String(pointerX));
-      forceEnd.setAttribute("cy", String(pointerY));
+      forceEnd.setAttribute("cx", String(rawPointerX));
+      forceEnd.setAttribute("cy", String(rawPointerY));
     }
   }
 
@@ -917,11 +981,40 @@ try {
     if (!cursorElement) return;
     const demoRect = demo.getBoundingClientRect();
     const action = findAction(event);
-    cursorElement.style.left = `${event.clientX - demoRect.left}px`;
-    cursorElement.style.top = `${event.clientY - demoRect.top}px`;
-    cursorElement.src = action === "edge" || action === "orbit"
-      ? "assets/3d/grip-hand.png"
-      : "assets/3d/pointer-hand.png";
+    const edgePick = action === "edge" ? getEdgePick(event) : null;
+    const cursorPoint = edgePick
+      ? projectGripToDemo(edgePick.localPoint)
+      : { x: event.clientX - demoRect.left, y: event.clientY - demoRect.top };
+    cursorElement.style.left = `${cursorPoint.x}px`;
+    cursorElement.style.top = `${cursorPoint.y}px`;
+    setCursorAction(action);
+  }
+
+  function setCursorAction(action) {
+    if (!cursorElement) return;
+    const gripping = action === "edge" || action === "orbit";
+    cursorElement.src = gripping ? "assets/3d/grip-hand.png" : "assets/3d/pointer-hand.png";
+    cursorElement.classList.toggle("is-grip", gripping);
+  }
+
+  function pointerIsInsideCanvas(event) {
+    const rect = canvas.getBoundingClientRect();
+    return event.clientX >= rect.left && event.clientX <= rect.right
+      && event.clientY >= rect.top && event.clientY <= rect.bottom;
+  }
+
+  function cancelActivePointer(event) {
+    if (pressedPointerId === null || event.pointerId !== pressedPointerId) return;
+    if (dragState) physicalTarget = dragState.startProgress;
+    dragState = null;
+    orbitState = null;
+    pressedAction = null;
+    pressedPointerId = null;
+    demo.classList.remove("is-dragging", "is-orbiting");
+    demo.classList.toggle("pointer-inside", pointerIsInsideCanvas(event));
+    forceVector?.classList.remove("is-blocked");
+    releaseDragCursor(event);
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   }
 
   canvas.addEventListener("pointerenter", () => {
@@ -932,6 +1025,7 @@ try {
   });
   canvas.addEventListener("pointermove", (event) => {
     if (guided) return;
+    if (pressedPointerId !== null && event.pointerId !== pressedPointerId) return;
     noteActivity();
     const demoRect = demo.getBoundingClientRect();
     if (cursorElement && !dragState) {
@@ -951,39 +1045,56 @@ try {
       const nextRotation = sceneRig.rotation.y + deltaX * 0.0065;
       sceneRig.rotation.y = Math.atan2(Math.sin(nextRotation), Math.cos(nextRotation));
       orbitState.lastX = event.clientX;
-      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
+      setCursorAction("orbit");
       return;
     }
 
     const action = findAction(event);
-    if (cursorElement) {
-      cursorElement.src = action === "edge" || action === "orbit"
-        ? "assets/3d/grip-hand.png"
-        : "assets/3d/pointer-hand.png";
+    if (action === "edge" && cursorElement) {
+      const edgePick = getEdgePick(event);
+      if (edgePick) {
+        const edgePoint = projectGripToDemo(edgePick.localPoint);
+        cursorElement.style.left = `${edgePoint.x}px`;
+        cursorElement.style.top = `${edgePoint.y}px`;
+      }
     }
+    setCursorAction(action);
   });
   canvas.addEventListener("pointerdown", (event) => {
+    if (dragState || orbitState || pressedPointerId !== null) return;
     interruptGuide();
     noteActivity();
     const action = findAction(event);
+    if (action === null) return;
     pressedAction = action;
+    pressedPointerId = event.pointerId;
     pressedAt = performance.now();
     bubbleHoldTriggered = false;
     if (action === "edge") {
-      const edgeHit = raycaster.intersectObjects(edgeHits, false)[0];
-      display.updateMatrixWorld(true);
+      const edgePick = getEdgePick(event);
+      if (!edgePick) {
+        pressedAction = null;
+        pressedPointerId = null;
+        return;
+      }
+      const demoRect = demo.getBoundingClientRect();
+      const initialGripPoint = projectGripToDemo(edgePick.localPoint);
       dragState = {
+        pointerId: event.pointerId,
         startProgress: physicalProgress,
         pointerX: event.clientX,
         pointerY: event.clientY,
+        pointerOffsetX: event.clientX - demoRect.left - initialGripPoint.x,
+        pointerOffsetY: event.clientY - demoRect.top - initialGripPoint.y,
         velocity: 0,
-        gripLocal: display.worldToLocal(edgeHit.point.clone())
+        gripLocal: edgePick.localPoint
       };
       forceVector?.classList.remove("is-blocked");
+      updateDragVisual();
       demo.classList.add("is-dragging");
     } else if (action === "orbit") {
-      orbitState = { lastX: event.clientX };
-      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
+      orbitState = { pointerId: event.pointerId, lastX: event.clientX };
+      setCursorAction("orbit");
       demo.classList.add("is-orbiting");
     }
     try {
@@ -993,6 +1104,7 @@ try {
     }
   });
   canvas.addEventListener("pointerup", (event) => {
+    if (pressedPointerId === null || event.pointerId !== pressedPointerId) return;
     interruptGuide();
     noteActivity();
     const now = performance.now();
@@ -1030,20 +1142,12 @@ try {
       }
     }
     pressedAction = null;
+    pressedPointerId = null;
+    if (!pointerIsInsideCanvas(event)) demo.classList.remove("pointer-inside");
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   });
-  canvas.addEventListener("pointercancel", (event) => {
-    if (dragState) {
-      physicalTarget = dragState.startProgress;
-      dragState = null;
-    }
-    orbitState = null;
-    pressedAction = null;
-    demo.classList.remove("is-dragging", "is-orbiting");
-    forceVector?.classList.remove("is-blocked");
-    releaseDragCursor(event);
-    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-  });
+  canvas.addEventListener("pointercancel", cancelActivePointer);
+  canvas.addEventListener("lostpointercapture", cancelActivePointer);
 
   for (const button of modeButtons) {
     button.addEventListener("click", () => {
