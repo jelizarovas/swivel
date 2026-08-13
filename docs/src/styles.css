@@ -385,6 +385,7 @@ h1 em {
   stroke-dasharray: 2 9;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 3px 5px rgba(48, 65, 166, 0.24));
+  transition: stroke 120ms ease;
 }
 
 .drag-force-end {
@@ -393,6 +394,16 @@ h1 em {
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 3px 6px rgba(48, 65, 166, 0.28));
+  transition: fill 120ms ease, stroke 120ms ease;
+}
+
+.drag-force-vector.is-blocked .drag-force-line {
+  stroke: #e5484d;
+}
+
+.drag-force-vector.is-blocked .drag-force-end {
+  fill: #fff5f5;
+  stroke: #e5484d;
 }
 
 .demo-cursor {
@@ -409,6 +420,20 @@ h1 em {
   transform-origin: 28% 18%;
 }
 
+.demo-grip {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  top: 0;
+  width: 112px;
+  height: auto;
+  display: none;
+  pointer-events: none;
+  filter: drop-shadow(0 9px 12px rgba(48, 41, 55, 0.18));
+  transform: translate(-30%, -66%) rotate(-12deg);
+  transform-origin: 30% 66%;
+}
+
 .demo.is-interactive {
   cursor: none;
 }
@@ -421,9 +446,12 @@ h1 em {
   display: block;
 }
 
-.demo.is-dragging .demo-cursor {
-  width: 112px;
-  transform: translate(-30%, -66%) rotate(-12deg);
+.demo.is-dragging .demo-grip {
+  display: block;
+}
+
+.demo.is-interactive.is-dragging .demo-cursor {
+  display: none;
 }
 
 .webgl-fallback {

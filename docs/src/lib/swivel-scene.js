@@ -5,6 +5,8 @@ const demo = root.matches?.(".demo") ? root : root.querySelector(".demo");
 const canvas = demo?.querySelector("#swivel-scene");
 const modeButtons = [...(demo?.querySelectorAll("[data-demo-mode]") ?? [])];
 const cursorElement = demo?.querySelector(".demo-cursor");
+const gripElement = demo?.querySelector(".demo-grip");
+const forceVector = demo?.querySelector(".drag-force-vector");
 const forceLine = demo?.querySelector(".drag-force-line");
 const forceEnd = demo?.querySelector(".drag-force-end");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -72,6 +74,16 @@ function cylinderBetween(start, end, radius, meshMaterial, radialSegments = 18) 
   );
   mesh.position.copy(start).add(end).multiplyScalar(0.5);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  mesh.castShadow = true;
+  return mesh;
+}
+
+function tubeAlong(points, radius, meshMaterial, tubularSegments = 28) {
+  const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
+  const mesh = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, tubularSegments, radius, 10, false),
+    meshMaterial
+  );
   mesh.castShadow = true;
   return mesh;
 }
@@ -199,7 +211,7 @@ try {
   camera.position.set(7.2, 5.4, 11.5);
   camera.lookAt(0, 0.25, 0);
 
-  scene.add(new THREE.HemisphereLight(0xfff7eb, 0x405171, 2.15));
+  scene.add(new THREE.HemisphereLight(0xfff7eb, 0x858893, 2.15));
   const key = new THREE.DirectionalLight(0xfff1df, 4.2);
   key.position.set(-4.5, 9, 8);
   key.castShadow = true;
@@ -209,9 +221,12 @@ try {
   key.shadow.camera.top = 9;
   key.shadow.camera.bottom = -7;
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x8ca4ff, 2.4);
+  const rim = new THREE.DirectionalLight(0xdce5ff, 2.15);
   rim.position.set(7, 3, -5);
   scene.add(rim);
+
+  const sceneRig = new THREE.Group();
+  scene.add(sceneRig);
 
   const stage = new THREE.Mesh(
     new THREE.CylinderGeometry(4.55, 4.8, 0.34, 64),
@@ -219,73 +234,161 @@ try {
   );
   stage.position.y = -2.83;
   stage.receiveShadow = true;
-  scene.add(stage);
+  sceneRig.add(stage);
 
-  const silver = material(0xd7dce3, 0.26, 0.7);
-  const darkSilver = material(0x7b8491, 0.32, 0.58);
-  const tire = material(0x69717d, 0.75, 0.05);
-  const shelfMaterial = material(0x777e89, 0.38, 0.48);
+  const silver = material(0xe1e4e8, 0.28, 0.24);
+  const whiteMetal = material(0xf3f4f3, 0.34, 0.3);
+  const whitePlastic = material(0xf4f4f1, 0.44, 0.04);
+  const rearPlastic = material(0xf7f7f4, 0.48, 0.02);
+  const darkSilver = material(0x7b8491, 0.38, 0.32);
+  const tire = material(0x4f5660, 0.82, 0.02);
+  const shelfMaterial = material(0x74777d, 0.9, 0.01);
+  const cableDark = material(0x343941, 0.72, 0.02);
+  const cableLight = material(0xd9dcde, 0.55, 0.04);
+  const logoMaterial = material(0xcfd2d2, 0.62, 0.02);
   const frameMaterial = material(0x11141b, 0.24, 0.5);
   const wallMaterial = material(0xe9e2d9, 0.88, 0.02);
 
   const stand = new THREE.Group();
   const legSpecs = [
-    [new THREE.Vector3(-1.78, 1.9, 0.02), new THREE.Vector3(-2.48, -2.38, 0.72)],
-    [new THREE.Vector3(1.78, 1.9, 0.02), new THREE.Vector3(2.48, -2.38, 0.72)],
-    [new THREE.Vector3(-1.48, 1.74, -0.54), new THREE.Vector3(-1.76, -2.36, -0.72)],
-    [new THREE.Vector3(1.48, 1.74, -0.54), new THREE.Vector3(1.76, -2.36, -0.72)]
+    [new THREE.Vector3(-1.68, 1.68, 0.12), new THREE.Vector3(-2.4, -2.36, 0.78)],
+    [new THREE.Vector3(1.68, 1.68, 0.12), new THREE.Vector3(2.4, -2.36, 0.78)],
+    [new THREE.Vector3(-1.58, 1.58, -0.3), new THREE.Vector3(-1.82, -2.36, -0.88)],
+    [new THREE.Vector3(1.58, 1.58, -0.3), new THREE.Vector3(1.82, -2.36, -0.88)]
   ];
   for (const [top, bottom] of legSpecs) {
-    stand.add(cylinderBetween(top, bottom, 0.095, silver));
+    stand.add(cylinderBetween(top, bottom, 0.092, whiteMetal, 24));
   }
 
-  const shelf = new THREE.Mesh(roundedSolid(3.7, 0.78, 0.28, 0.22, 0.035), shelfMaterial);
-  shelf.rotation.x = -Math.PI / 2;
-  shelf.position.set(0, -0.82, 0.08);
-  shelf.castShadow = true;
-  stand.add(shelf);
+  for (const z of [-0.48, 0.48]) {
+    stand.add(cylinderBetween(
+      new THREE.Vector3(-1.93, -1.18, z),
+      new THREE.Vector3(1.93, -1.18, z),
+      0.062,
+      whiteMetal,
+      20));
+  }
+
+  const shelfShell = new THREE.Mesh(roundedSolid(3.92, 1.04, 0.36, 0.24, 0.045), whitePlastic);
+  shelfShell.rotation.x = -Math.PI / 2;
+  shelfShell.position.set(0, -1.12, 0.02);
+  shelfShell.castShadow = true;
+  stand.add(shelfShell);
+  const shelfTop = new THREE.Mesh(roundedSolid(3.7, 0.84, 0.29, 0.045, 0.018), shelfMaterial);
+  shelfTop.rotation.x = -Math.PI / 2;
+  shelfTop.position.set(0, -0.975, 0.02);
+  shelfTop.castShadow = true;
+  stand.add(shelfTop);
+
+  for (const x of [-1.64, 1.64]) {
+    const hinge = new THREE.Group();
+    hinge.position.set(x, 1.6, -0.03);
+    const hingeBody = new THREE.Mesh(roundedSolid(0.34, 0.46, 0.14, 0.34, 0.035), whitePlastic);
+    hingeBody.castShadow = true;
+    hinge.add(hingeBody);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.39, 24), silver);
+    pin.rotation.x = Math.PI / 2;
+    pin.position.z = 0.015;
+    pin.castShadow = true;
+    hinge.add(pin);
+    stand.add(hinge);
+  }
 
   const wheelSpecs = [
-    [-2.48, -2.42, 0.72],
-    [2.48, -2.42, 0.72],
-    [-1.76, -2.42, -0.72],
-    [1.76, -2.42, -0.72]
+    [-2.4, -2.42, 0.78, -0.2],
+    [2.4, -2.42, 0.78, 0.18],
+    [-1.82, -2.42, -0.88, 0.24],
+    [1.82, -2.42, -0.88, -0.16]
   ];
-  for (const [x, y, z] of wheelSpecs) {
+  for (const [x, y, z, yaw] of wheelSpecs) {
     const wheel = new THREE.Group();
     wheel.position.set(x, y, z);
-    const fork = cylinderBetween(new THREE.Vector3(0, 0.16, 0), new THREE.Vector3(0, -0.02, 0), 0.065, darkSilver, 12);
-    wheel.add(fork);
-    const tyreMesh = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.075, 12, 28), tire);
-    tyreMesh.rotation.y = Math.PI / 2;
-    tyreMesh.castShadow = true;
-    wheel.add(tyreMesh);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.11, 20), silver);
-    hub.rotation.z = Math.PI / 2;
-    wheel.add(hub);
+    wheel.rotation.y = yaw;
+    wheel.add(cylinderBetween(
+      new THREE.Vector3(0, 0.24, 0),
+      new THREE.Vector3(0, 0.07, 0),
+      0.055,
+      darkSilver,
+      16));
+    const casterShoulder = new THREE.Mesh(roundedSolid(0.34, 0.2, 0.08, 0.18, 0.025), whitePlastic);
+    casterShoulder.rotation.x = -0.12;
+    casterShoulder.position.set(0, 0.04, 0.045);
+    casterShoulder.castShadow = true;
+    wheel.add(casterShoulder);
+    for (const side of [-1, 1]) {
+      const fork = cylinderBetween(
+        new THREE.Vector3(side * 0.13, 0.06, 0),
+        new THREE.Vector3(side * 0.13, -0.1, 0),
+        0.032,
+        whiteMetal,
+        12);
+      wheel.add(fork);
+      const wheelDisc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.23, 0.23, 0.075, 30),
+        [tire, whitePlastic, whitePlastic]);
+      wheelDisc.rotation.z = Math.PI / 2;
+      wheelDisc.position.set(side * 0.07, -0.12, 0);
+      wheelDisc.castShadow = true;
+      wheel.add(wheelDisc);
+    }
+    const axle = cylinderBetween(
+      new THREE.Vector3(-0.17, -0.12, 0),
+      new THREE.Vector3(0.17, -0.12, 0),
+      0.035,
+      darkSilver,
+      12);
+    wheel.add(axle);
+    for (const side of [-1, 1]) {
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.016, 24), darkSilver);
+      hub.rotation.z = Math.PI / 2;
+      hub.position.set(side * 0.112, -0.12, 0);
+      wheel.add(hub);
+    }
     stand.add(wheel);
   }
-  const mountPlate = new THREE.Mesh(new THREE.CylinderGeometry(1.36, 1.36, 0.18, 48), silver);
-  mountPlate.rotation.x = Math.PI / 2;
-  mountPlate.scale.y = 1.2;
-  mountPlate.position.set(0, 1.55, -0.3);
-  mountPlate.castShadow = true;
-  stand.add(mountPlate);
 
-  const mountRibs = new THREE.Group();
-  mountRibs.position.set(0, 1.55, -0.18);
-  for (const x of [-0.76, -0.38, 0, 0.38, 0.76]) {
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.055, 2.58, 0.055), darkSilver);
-    rib.position.x = x;
-    mountRibs.add(rib);
+  const mountAssembly = new THREE.Group();
+  mountAssembly.position.set(0, 0, -0.33);
+  const mountRim = new THREE.Mesh(new THREE.CylinderGeometry(1.51, 1.51, 0.17, 64), whiteMetal);
+  mountRim.rotation.x = Math.PI / 2;
+  mountRim.castShadow = true;
+  mountAssembly.add(mountRim);
+  const mountFace = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, 0.075, 64), whitePlastic);
+  mountFace.rotation.x = Math.PI / 2;
+  mountFace.position.z = -0.09;
+  mountFace.castShadow = true;
+  mountAssembly.add(mountFace);
+  for (const x of [-0.092, 0.092]) {
+    for (const y of [-0.092, 0.092]) {
+      const logoTile = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.018), logoMaterial);
+      logoTile.position.set(x, y, -0.135);
+      mountAssembly.add(logoTile);
+    }
   }
-  for (const y of [-0.88, -0.44, 0, 0.44, 0.88]) {
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.055, 0.055), darkSilver);
-    rib.position.y = y;
-    mountRibs.add(rib);
+  for (const x of [-1.53, 1.53]) {
+    stand.add(cylinderBetween(
+      new THREE.Vector3(x, 1.56, 0.02),
+      new THREE.Vector3(x * 0.92, 1.56, 0.31),
+      0.082,
+      whiteMetal,
+      18));
   }
-  stand.add(mountRibs);
-  scene.add(stand);
+
+  stand.add(tubeAlong([
+    new THREE.Vector3(0.46, 0.4, 0.23),
+    new THREE.Vector3(0.72, 0.18, 0.18),
+    new THREE.Vector3(0.76, -0.14, 0.12),
+    new THREE.Vector3(0.67, -0.7, 0.06),
+    new THREE.Vector3(0.48, -0.95, 0.02)
+  ], 0.025, cableDark));
+  stand.add(tubeAlong([
+    new THREE.Vector3(0.72, 0.48, 0.24),
+    new THREE.Vector3(0.9, 0.24, 0.19),
+    new THREE.Vector3(0.88, -0.08, 0.13),
+    new THREE.Vector3(0.76, -0.64, 0.07),
+    new THREE.Vector3(0.62, -0.91, 0.03)
+  ], 0.019, cableLight));
+  sceneRig.add(stand);
 
   const wallMount = new THREE.Group();
   const wallSurface = new THREE.Mesh(roundedSolid(8.8, 7.2, 0.45, 0.12, 0.03), wallMaterial);
@@ -326,7 +429,7 @@ try {
     wallMount.add(slot);
   }
   wallMount.visible = false;
-  scene.add(wallMount);
+  sceneRig.add(wallMount);
 
   const monitorStand = new THREE.Group();
   const monitorStem = cylinderBetween(
@@ -349,22 +452,29 @@ try {
   monitorBase.castShadow = true;
   monitorStand.add(monitorBase);
   monitorStand.visible = false;
-  scene.add(monitorStand);
+  sceneRig.add(monitorStand);
 
   // Pitch the panel back around its horizontal axis. The camera supplies the
   // isometric side view; the screen itself stays square to its physical mount.
   const displayMount = new THREE.Group();
   displayMount.position.set(0, 1.55, 0.82);
   displayMount.rotation.x = -0.14;
-  scene.add(displayMount);
+  sceneRig.add(displayMount);
 
   const display = new THREE.Group();
   displayMount.add(display);
+  display.add(mountAssembly);
 
   const chassis = new THREE.Mesh(roundedSolid(5.88, 3.5, 0.27, 0.28, 0.055), silver);
   chassis.castShadow = true;
   chassis.receiveShadow = true;
   display.add(chassis);
+
+  const rearShell = new THREE.Mesh(roundedSolid(5.68, 3.3, 0.23, 0.075, 0.028), rearPlastic);
+  rearShell.position.z = -0.17;
+  rearShell.castShadow = true;
+  rearShell.receiveShadow = true;
+  display.add(rearShell);
 
   const frame = new THREE.Mesh(roundedSolid(5.72, 3.34, 0.22, 0.11, 0.04), frameMaterial);
   frame.position.z = 0.07;
@@ -404,17 +514,33 @@ try {
   reflection.renderOrder = 4;
   display.add(reflection);
 
+  const cameraPod = new THREE.Group();
+  cameraPod.position.set(0, 1.88, 0.015);
+  const cameraStem = new THREE.Mesh(roundedSolid(0.15, 0.24, 0.06, 0.13, 0.018), whitePlastic);
+  cameraStem.position.y = -0.07;
+  cameraStem.castShadow = true;
+  cameraPod.add(cameraStem);
+  const cameraBody = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.135, 30), whitePlastic);
+  cameraBody.rotation.x = Math.PI / 2;
+  cameraBody.castShadow = true;
+  cameraPod.add(cameraBody);
+  const cameraLens = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.018, 28), frameMaterial);
+  cameraLens.rotation.x = Math.PI / 2;
+  cameraLens.position.z = 0.078;
+  cameraPod.add(cameraLens);
+  display.add(cameraPod);
+
   const reader = new THREE.Group();
   reader.position.set(2.96, 0, 0.02);
-  const readerBody = new THREE.Mesh(roundedSolid(0.28, 0.7, 0.12, 0.25, 0.025), silver);
+  const readerBody = new THREE.Mesh(roundedSolid(0.22, 0.44, 0.1, 0.2, 0.022), silver);
   readerBody.castShadow = true;
   reader.add(readerBody);
   const readerInset = new THREE.Mesh(
-    new THREE.CircleGeometry(0.095, 24),
+    new THREE.CircleGeometry(0.072, 24),
     new THREE.MeshBasicMaterial({ color: 0x7b8491 })
   );
-  readerInset.scale.y = 1.65;
-  readerInset.position.z = 0.15;
+  readerInset.scale.y = 1.42;
+  readerInset.position.z = 0.125;
   reader.add(readerInset);
   const readerHit = new THREE.Mesh(
     new THREE.PlaneGeometry(0.34, 0.76),
@@ -428,7 +554,7 @@ try {
   const [buttonTexture, pointerTexture, gripTexture] = await Promise.all([
     loader.loadAsync("assets/3d/rotation-button.png?v=3"),
     loader.loadAsync("assets/3d/pointer-hand.png"),
-    loader.loadAsync("assets/3d/grip-hand-v2.png")
+    loader.loadAsync("assets/3d/grip-hand.png")
   ]);
   for (const texture of [buttonTexture, pointerTexture, gripTexture]) {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -596,6 +722,7 @@ try {
   let pressedAt = 0;
   let bubbleHoldTriggered = false;
   let dragState = null;
+  let orbitState = null;
   let guidedContentProgress = 0;
 
   function applyMode(mode) {
@@ -610,6 +737,7 @@ try {
 
     displayMount.rotation.y = 0;
     if (mode === "wall") {
+      sceneRig.rotation.y = 0;
       displayMount.position.set(0, 0.3, -0.12);
       displayMount.rotation.x = 0;
       display.scale.setScalar(0.92);
@@ -647,7 +775,9 @@ try {
     bubbleVisible = false;
     settingsVisibleUntil = 0;
     dragState = null;
-    demo.classList.remove("is-interactive", "is-dragging", "pointer-inside");
+    orbitState = null;
+    sceneRig.rotation.y = 0;
+    demo.classList.remove("is-interactive", "is-dragging", "is-orbiting", "pointer-inside");
     setPhase("guided", message);
   }
 
@@ -689,10 +819,12 @@ try {
     raycaster.setFromCamera(rayPosition, camera);
     if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
     if (currentMode === "monitor") {
-      return raycaster.intersectObject(trayHit, false).length > 0 ? "trigger" : null;
+      if (raycaster.intersectObject(trayHit, false).length > 0) return "trigger";
+      return raycaster.intersectObject(stage, false).length > 0 ? "orbit" : null;
     }
     if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
     if (raycaster.intersectObjects(edgeHits, false).length > 0) return "edge";
+    if (currentMode !== "wall" && raycaster.intersectObject(stage, false).length > 0) return "orbit";
     return null;
   }
 
@@ -727,6 +859,8 @@ try {
     const forceY = pointerY - gripPoint.y;
     const radialLength = Math.max(1, Math.hypot(radialX, radialY));
     const tangentialForce = (radialX * forceY - radialY * forceX) / radialLength;
+    dragState.blocked = (physicalProgress <= 0.001 && tangentialForce < -6)
+      || (physicalProgress >= 0.999 && tangentialForce > 6);
     const effectiveForce = Math.sign(tangentialForce)
       * Math.max(0, Math.abs(tangentialForce) - 6);
     const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
@@ -740,9 +874,10 @@ try {
     const geometry = getDragGeometry();
     if (!geometry) return;
     const { pointerX, pointerY, gripPoint } = geometry;
-    if (cursorElement) {
-      cursorElement.style.left = `${gripPoint.x}px`;
-      cursorElement.style.top = `${gripPoint.y}px`;
+    forceVector?.classList.toggle("is-blocked", Boolean(dragState.blocked));
+    if (gripElement) {
+      gripElement.style.left = `${gripPoint.x}px`;
+      gripElement.style.top = `${gripPoint.y}px`;
     }
     if (forceLine) {
       forceLine.setAttribute("x1", String(gripPoint.x));
@@ -781,10 +916,11 @@ try {
   function releaseDragCursor(event) {
     if (!cursorElement) return;
     const demoRect = demo.getBoundingClientRect();
+    const action = findAction(event);
     cursorElement.style.left = `${event.clientX - demoRect.left}px`;
     cursorElement.style.top = `${event.clientY - demoRect.top}px`;
-    cursorElement.src = findAction(event) === "edge"
-      ? "assets/3d/grip-hand-v2.png"
+    cursorElement.src = action === "edge" || action === "orbit"
+      ? "assets/3d/grip-hand.png"
       : "assets/3d/pointer-hand.png";
   }
 
@@ -792,7 +928,7 @@ try {
     if (!guided) demo.classList.add("pointer-inside");
   });
   canvas.addEventListener("pointerleave", () => {
-    if (!dragState) demo.classList.remove("pointer-inside");
+    if (!dragState && !orbitState) demo.classList.remove("pointer-inside");
   });
   canvas.addEventListener("pointermove", (event) => {
     if (guided) return;
@@ -810,10 +946,19 @@ try {
       return;
     }
 
+    if (orbitState) {
+      const deltaX = event.clientX - orbitState.lastX;
+      const nextRotation = sceneRig.rotation.y + deltaX * 0.0065;
+      sceneRig.rotation.y = Math.atan2(Math.sin(nextRotation), Math.cos(nextRotation));
+      orbitState.lastX = event.clientX;
+      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
+      return;
+    }
+
     const action = findAction(event);
     if (cursorElement) {
-      cursorElement.src = action === "edge"
-        ? "assets/3d/grip-hand-v2.png"
+      cursorElement.src = action === "edge" || action === "orbit"
+        ? "assets/3d/grip-hand.png"
         : "assets/3d/pointer-hand.png";
     }
   });
@@ -834,8 +979,12 @@ try {
         velocity: 0,
         gripLocal: display.worldToLocal(edgeHit.point.clone())
       };
-      if (cursorElement) cursorElement.src = "assets/3d/grip-hand-v2.png";
+      forceVector?.classList.remove("is-blocked");
       demo.classList.add("is-dragging");
+    } else if (action === "orbit") {
+      orbitState = { lastX: event.clientX };
+      if (cursorElement) cursorElement.src = "assets/3d/grip-hand.png";
+      demo.classList.add("is-orbiting");
     }
     try {
       canvas.setPointerCapture(event.pointerId);
@@ -855,8 +1004,13 @@ try {
         : (releaseProgress >= 0.85 ? 1 : 0);
       dragState = null;
       demo.classList.remove("is-dragging");
+      forceVector?.classList.remove("is-blocked");
       releaseDragCursor(event);
       updateInteractiveCaption();
+    } else if (orbitState) {
+      orbitState = null;
+      demo.classList.remove("is-orbiting");
+      releaseDragCursor(event);
     } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
       if (currentMode === "monitor") {
         const next = contentTarget > 0.5 ? 0 : 1;
@@ -883,8 +1037,10 @@ try {
       physicalTarget = dragState.startProgress;
       dragState = null;
     }
+    orbitState = null;
     pressedAction = null;
-    demo.classList.remove("is-dragging");
+    demo.classList.remove("is-dragging", "is-orbiting");
+    forceVector?.classList.remove("is-blocked");
     releaseDragCursor(event);
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   });
@@ -1176,6 +1332,6 @@ return () => {
   cancelAnimationFrame(animationFrame);
   observer?.disconnect();
   renderer?.dispose();
-  demo.classList.remove("webgl-ready", "is-interactive", "is-dragging", "pointer-inside");
+  demo.classList.remove("webgl-ready", "is-interactive", "is-dragging", "is-orbiting", "pointer-inside");
 };
 }

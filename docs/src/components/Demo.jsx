@@ -49,6 +49,7 @@ export function Demo() {
       </svg>
       <div className="scene-shine" aria-hidden="true" />
       <img className="demo-cursor" src={`${base}assets/3d/pointer-hand.png`} alt="" aria-hidden="true" />
+      <img className="demo-grip" src={`${base}assets/3d/grip-hand.png`} alt="" aria-hidden="true" />
     </figure>
   );
 }
