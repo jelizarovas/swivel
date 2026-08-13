@@ -5,6 +5,8 @@ artifacts/
 *.suo
 .vs/
 TestResults/
+docs/node_modules/
+docs/dist/
 .env
 .env.*
 *.pfx

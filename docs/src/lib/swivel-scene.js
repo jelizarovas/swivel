@@ -1,13 +1,21 @@
-import * as THREE from "./vendor/three.module.min.js";
+import * as THREE from "three";
 
-const canvas = document.querySelector("#swivel-scene");
-const demo = document.querySelector(".demo");
-const modeButtons = [...document.querySelectorAll("[data-demo-mode]")];
-const cursorElement = document.querySelector(".demo-cursor");
+export async function mountSwivelScene(root = document) {
+const demo = root.matches?.(".demo") ? root : root.querySelector(".demo");
+const canvas = demo?.querySelector("#swivel-scene");
+const modeButtons = [...(demo?.querySelectorAll("[data-demo-mode]") ?? [])];
+const cursorElement = demo?.querySelector(".demo-cursor");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const requestedTime = Number.parseFloat(new URLSearchParams(window.location.search).get("t"));
 const frozenTime = Number.isFinite(requestedTime) ? requestedTime : null;
 const requestedMode = new URLSearchParams(window.location.search).get("mode");
+let renderer = null;
+let observer = null;
+let animationFrame = 0;
+let disposed = false;
+const scheduleFrame = (callback) => {
+  if (!disposed) animationFrame = requestAnimationFrame(callback);
+};
 
 if (!canvas || !demo) {
   throw new Error("Swivel scene mount is missing.");
@@ -171,7 +179,7 @@ function createLabelTexture(label) {
 }
 
 try {
-  const renderer = new THREE.WebGLRenderer({
+  renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
     antialias: true,
@@ -515,7 +523,7 @@ try {
   const panelCorner = new THREE.Vector3();
   let currentPhase = "";
 
-  function setPhase(name, text) {
+  function setPhase(name) {
     if (name === currentPhase) return;
     currentPhase = name;
     demo.dataset.phase = name;
@@ -856,7 +864,7 @@ try {
       pointer.visible = false;
       grip.visible = false;
       renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      scheduleFrame(animate);
       return;
     }
 
@@ -911,7 +919,7 @@ try {
         pointerOpacity = 1 - segment(t, 6.3, 6.75);
       } else if (frozenTime === null) {
         enterInteractive();
-        requestAnimationFrame(animate);
+        scheduleFrame(animate);
         return;
       }
     } else if (t < 1.15) {
@@ -929,7 +937,6 @@ try {
     } else if (t < 4.2) {
       setPhase("tap-bubble", "Tap the blue button");
       bubbleOpacity = 1;
-      bubbleScale = 1;
       bubbleProgress = mix(0.46, 0.63, segment(t, 3.05, 4.2));
       pointerFromTarget = "bubble";
       pointerToTarget = "bubble";
@@ -1006,7 +1013,7 @@ try {
     } else {
       if (frozenTime === null) {
         enterInteractive();
-        requestAnimationFrame(animate);
+        scheduleFrame(animate);
         return;
       }
       setPhase("done", "Now you try it.");
@@ -1049,7 +1056,7 @@ try {
     }
 
     renderer.render(scene, camera);
-    requestAnimationFrame(animate);
+    scheduleFrame(animate);
   }
 
   function resize() {
@@ -1058,13 +1065,22 @@ try {
     renderer.setSize(size, size, false);
   }
 
-  const observer = new ResizeObserver(resize);
+  observer = new ResizeObserver(resize);
   observer.observe(demo);
   resize();
   demo.classList.add("webgl-ready");
   demo.dataset.phase = reduceMotion ? "reduced-motion" : "ready";
-  requestAnimationFrame(animate);
+  scheduleFrame(animate);
 } catch (error) {
   console.warn("Swivel 3D preview unavailable; showing the poster instead.", error);
   demo.dataset.phase = "fallback";
+}
+
+return () => {
+  disposed = true;
+  cancelAnimationFrame(animationFrame);
+  observer?.disconnect();
+  renderer?.dispose();
+  demo.classList.remove("webgl-ready", "is-interactive", "is-dragging", "pointer-inside");
+};
 }

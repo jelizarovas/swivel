@@ -89,6 +89,18 @@ dotnet publish .\Swivel.csproj -p:PublishProfile=Portable
 
 Both profiles produce single-file executables. `Compact` is about 317 KB and relies on the installed desktop runtime. `Portable` includes that runtime and is about 68 MiB.
 
+## Website development
+
+The landing page and interactive Three.js demo are a React, Vite, and Tailwind CSS project in `docs`.
+
+```powershell
+cd .\docs
+npm install
+npm run dev
+```
+
+Run `npm run check` and `npm run build` before committing. Changes under `docs` deploy to GitHub Pages automatically after they reach `main`.
+
 ## Current verification boundary
 
 - Confirmed locally: clean Release compilation, settings round-trip, display-mode inspection, placement calculations, simulated bubble rendering, tray startup, fingerprint-reader absence handling, and graceful shutdown.
