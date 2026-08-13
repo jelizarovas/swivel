@@ -566,6 +566,7 @@ try {
   const rayPosition = new THREE.Vector2();
   const cameraGoal = new THREE.Vector3(7.2, 5.4, 11.5);
   const cameraLook = new THREE.Vector3(0, 0.25, 0);
+  let stageOffsetX = 0;
   let currentMode = "stand";
   let guided = !reduceMotion;
   let guidedStartedAt = performance.now();
@@ -614,6 +615,9 @@ try {
       cameraGoal.set(7.2, 5.4, 11.5);
       cameraLook.set(0, 0.25, 0);
     }
+
+    cameraGoal.x += stageOffsetX;
+    cameraLook.x = stageOffsetX;
 
     for (const button of modeButtons) {
       button.setAttribute("aria-selected", String(button.dataset.demoMode === mode));
@@ -1061,8 +1065,23 @@ try {
 
   function resize() {
     const rect = demo.getBoundingClientRect();
-    const size = Math.max(1, Math.floor(Math.min(rect.width, rect.height)));
-    renderer.setSize(size, size, false);
+    const width = Math.max(1, Math.floor(rect.width));
+    const height = Math.max(1, Math.floor(rect.height));
+    const aspect = width / height;
+    const verticalHalf = 5.8;
+    camera.left = -verticalHalf * aspect;
+    camera.right = verticalHalf * aspect;
+    camera.top = verticalHalf;
+    camera.bottom = -verticalHalf;
+    camera.updateProjectionMatrix();
+
+    const previousOffset = stageOffsetX;
+    stageOffsetX = aspect > 1.1
+      ? -Math.min(5.2, (aspect - 1) * 5.2)
+      : 0;
+    cameraGoal.x += stageOffsetX - previousOffset;
+    cameraLook.x = stageOffsetX;
+    renderer.setSize(width, height, false);
   }
 
   observer = new ResizeObserver(resize);

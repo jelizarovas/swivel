@@ -45,19 +45,25 @@ body::before {
 }
 
 .page-shell {
-  width: min(1500px, 100%);
+  position: relative;
+  width: 100%;
   height: 100svh;
-  margin: 0 auto;
-  padding: clamp(18px, 2.4vw, 38px) clamp(22px, 4vw, 68px);
+  margin: 0;
+  padding: clamp(18px, 2.4vw, 38px) clamp(22px, 3vw, 56px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .topbar {
+  position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 42px;
+  pointer-events: none;
 }
 
 .brand {
@@ -69,6 +75,7 @@ body::before {
   letter-spacing: -0.03em;
   color: inherit;
   text-decoration: none;
+  pointer-events: auto;
 }
 
 .brand img {
@@ -87,6 +94,7 @@ body::before {
   display: flex;
   align-items: center;
   gap: 14px;
+  pointer-events: auto;
 }
 
 .github-link {
@@ -137,18 +145,24 @@ body::before {
 }
 
 .hero {
+  position: relative;
+  z-index: 2;
+  width: 100%;
   min-height: 0;
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(360px, 0.82fr) minmax(460px, 1.18fr);
+  display: flex;
   align-items: center;
-  gap: clamp(26px, 4.8vw, 82px);
+  pointer-events: none;
 }
 
 .hero-copy {
-  z-index: 2;
+  position: relative;
+  z-index: 10;
+  width: min(100%, 610px);
   min-width: 0;
   max-width: 610px;
+  margin-left: clamp(0px, 6vw, 122px);
+  pointer-events: auto;
 }
 
 h1 {
@@ -285,27 +299,30 @@ h1 em {
 }
 
 .demo {
-  position: relative;
+  position: fixed;
+  z-index: 1;
+  inset: 0;
   min-width: 0;
-  width: min(100%, calc(100svh - 118px));
-  aspect-ratio: 1;
-  max-height: calc(100svh - 118px);
+  width: 100vw;
+  height: 100svh;
+  max-height: none;
+  aspect-ratio: auto;
   margin: 0;
-  justify-self: end;
   overflow: hidden;
-  border: 1px solid rgba(23, 24, 33, 0.08);
-  border-radius: clamp(26px, 3vw, 44px);
-  background: #fbf5ed;
-  box-shadow: var(--shadow);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   isolation: isolate;
   touch-action: none;
+  pointer-events: auto;
 }
 
 .demo-tabs {
   position: absolute;
   z-index: 8;
-  top: 18px;
-  left: 50%;
+  top: 86px;
+  left: 75%;
   display: flex;
   padding: 4px;
   border: 1px solid rgba(23, 24, 33, 0.09);
@@ -381,7 +398,8 @@ h1 em {
 }
 
 .webgl-fallback {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: 76% center;
   opacity: 1;
   transition: opacity 420ms ease;
 }
@@ -488,14 +506,20 @@ h1 em {
   }
 
   .hero {
+    z-index: auto;
+    display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 12px;
     padding-top: 10px;
+    pointer-events: auto;
   }
 
   .hero-copy {
+    width: 100%;
     max-width: none;
+    margin-left: 0;
+    justify-self: stretch;
   }
 
   h1 {
@@ -526,15 +550,24 @@ h1 em {
   }
 
   .demo {
+    position: relative;
+    z-index: auto;
+    inset: auto;
     width: min(100%, 42svh);
+    height: auto;
     max-height: 42svh;
+    aspect-ratio: 1;
     justify-self: center;
     align-self: end;
+    border: 1px solid rgba(23, 24, 33, 0.08);
     border-radius: 24px;
+    background: #fbf5ed;
+    box-shadow: var(--shadow);
   }
 
   .demo-tabs {
     top: 10px;
+    left: 50%;
   }
 
   .demo-tabs button {

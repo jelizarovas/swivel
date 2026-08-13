@@ -38,7 +38,7 @@ export default function App() {
 
   return (
     <>
-      <main className="page-shell mx-auto grid h-svh w-full">
+      <main className="page-shell grid h-svh w-full">
         <Header />
         <section className="hero grid min-h-0 min-w-0 items-center" aria-labelledby="hero-title">
           <HeroCopy openModal={openModal} />
