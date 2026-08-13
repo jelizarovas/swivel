@@ -1,15 +1,60 @@
-bin/
-obj/
+# .NET build output
+[Bb]in/
+[Oo]bj/
 artifacts/
-*.user
-*.suo
+publish/
+
+# Visual Studio, Rider, and user-local IDE state
 .vs/
+.idea/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+_ReSharper*/
+
+# Tests and coverage
 TestResults/
-docs/node_modules/
-docs/dist/
+coverage/
+*.coverage
+*.coveragexml
+
+# Node, Vite, and frontend build output
+**/node_modules/
+**/dist/
+**/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local configuration and secrets
 .env
 .env.*
+!.env.example
 *.pfx
+*.p12
 *.snk
 *.cer
+*.crt
 *.key
+*.pem
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+logs/
+tmp/
+temp/
+
+# Operating-system and editor noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
