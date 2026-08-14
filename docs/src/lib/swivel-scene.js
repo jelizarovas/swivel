@@ -1591,18 +1591,8 @@ try {
       * Math.max(0, Math.abs(tangentialForce) - 6);
     const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
     const velocity = clamp(effectiveForce / dragDistance * 9.5, -2.75, 2.75);
-    const previousPhysicalProgress = physicalProgress;
     physicalProgress = clamp(physicalProgress + velocity * deltaSeconds);
     physicalTarget = physicalProgress;
-    const physicalMovement = physicalProgress - previousPhysicalProgress;
-    if (Math.abs(physicalMovement) > 0.000001 && dragState.syncContentWithPhysical) {
-      // A direct hardware turn acts like a gyro replacement: the responsive
-      // desktop follows the panel's real position, including reversals. If the
-      // bubble already requested the opposite orientation, preserve that
-      // deliberate pixels-first sequence while the user turns the panel.
-      contentProgress = physicalProgress;
-      contentTarget = physicalProgress;
-    }
     dragState.velocity = velocity;
   }
 
@@ -1715,7 +1705,6 @@ try {
     if (pressedPointerId === null || event.pointerId !== pressedPointerId) return;
     if (dragState) {
       physicalTarget = dragState.startProgress;
-      contentTarget = dragState.startContentTarget;
     }
     dragState = null;
     pendulumDragState = null;
@@ -1835,8 +1824,6 @@ try {
       dragState = {
         pointerId: event.pointerId,
         startProgress: physicalProgress,
-        startContentTarget: contentTarget,
-        syncContentWithPhysical: Math.abs(contentTarget - Math.round(physicalProgress)) < 0.001,
         pointerX: event.clientX,
         pointerY: event.clientY,
         pointerOffsetX: event.clientX - demoRect.left - initialGripPoint.x,
@@ -1910,9 +1897,6 @@ try {
       physicalTarget = startedPortrait
         ? (releaseProgress <= 0.15 ? 0 : 1)
         : (releaseProgress >= 0.85 ? 1 : 0);
-      // The demo's virtual desktop follows the physical snap so it remains
-      // upright and receives vertical feed gestures in portrait.
-      contentTarget = physicalTarget;
       dragState = null;
       demo.classList.remove("is-dragging");
       forceVector?.classList.remove("is-blocked");
@@ -2329,7 +2313,6 @@ try {
     const pointerId = pressedPointerId;
     if (dragState) {
       physicalTarget = dragState.startProgress;
-      contentTarget = dragState.startContentTarget;
     }
     if (desktopPointerState && !desktopPointerState.cancelled) {
       ui.pointerCancel({ pointerId: desktopPointerState.pointerId });
