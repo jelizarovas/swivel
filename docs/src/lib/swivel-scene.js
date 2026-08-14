@@ -838,14 +838,25 @@ try {
   frame.receiveShadow = true;
   display.add(frame);
 
+  let desktopPowerState = "on";
+  let desktopPowerChangedAt = performance.now();
+  let powerPresentationDirty = true;
   const ui = createInteractiveDesktopTexture({
     quality: renderQualityName,
     onRotationRequest: () => {
       const next = contentTarget > 0.5 ? 0 : 1;
       contentTarget = next;
       if (currentMode === "monitor") physicalTarget = next;
+    },
+    onPowerStateChange: (nextState) => {
+      desktopPowerState = nextState;
+      desktopPowerChangedAt = performance.now();
+      powerPresentationDirty = true;
+      demo.dataset.powerState = nextState;
     }
   });
+  desktopPowerState = ui.getPowerState();
+  demo.dataset.powerState = desktopPowerState;
   disposeUi = () => ui.dispose();
   const screenMaterial = new THREE.MeshBasicMaterial({ map: ui.texture, toneMapped: false });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(screenWidth, screenHeight), screenMaterial);
@@ -1005,13 +1016,51 @@ try {
   reader.add(readerHit);
   display.add(reader);
 
+  const powerButtonMaterial = new THREE.MeshStandardMaterial({
+    color: 0x252932,
+    roughness: 0.42,
+    metalness: 0.18,
+    emissive: 0x000000,
+    emissiveIntensity: 0
+  });
+  const powerIndicatorMaterial = new THREE.MeshBasicMaterial({
+    color: 0x697180,
+    transparent: true,
+    opacity: 0.42,
+    toneMapped: false
+  });
+  const powerButton = new THREE.Group();
+  powerButton.position.set(-2.82, -2.19, 0.24);
+  const powerButtonBody = new THREE.Mesh(
+    roundedSolid(0.38, 0.14, 0.1, 0.055, 0.015),
+    powerButtonMaterial
+  );
+  powerButton.add(powerButtonBody);
+  const powerIndicator = new THREE.Mesh(new THREE.CircleGeometry(0.026, 20), powerIndicatorMaterial);
+  powerIndicator.position.set(0.115, 0, 0.062);
+  powerButton.add(powerIndicator);
+  const powerButtonHit = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.7, 0.44),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.001,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    })
+  );
+  powerButtonHit.position.z = 0.13;
+  powerButtonHit.userData.action = "power";
+  powerButton.add(powerButtonHit);
+  display.add(powerButton);
+
   const loader = new THREE.TextureLoader();
-  const [buttonTexture, pointerTexture, gripTexture] = await Promise.all([
+  const [buttonTexture, pointerTexture, gripTexture, confusedHandsTexture] = await Promise.all([
     loader.loadAsync("assets/3d/rotation-button.png?v=3"),
     loader.loadAsync("assets/3d/pointer-hand.png"),
-    loader.loadAsync("assets/3d/grip-hand.png")
+    loader.loadAsync("assets/3d/grip-hand.png"),
+    loader.loadAsync("assets/3d/confused-hands.png")
   ]);
-  for (const texture of [buttonTexture, pointerTexture, gripTexture]) {
+  for (const texture of [buttonTexture, pointerTexture, gripTexture, confusedHandsTexture]) {
     texture.colorSpace = THREE.SRGBColorSpace;
   }
 
@@ -1122,6 +1171,19 @@ try {
   grip.renderOrder = 19;
   scene.add(grip);
 
+  const confusedHandsMaterial = new THREE.SpriteMaterial({
+    map: confusedHandsTexture,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    toneMapped: false
+  });
+  const confusedHands = new THREE.Sprite(confusedHandsMaterial);
+  confusedHands.scale.set(3, 2.44, 1);
+  confusedHands.renderOrder = 21;
+  confusedHands.visible = false;
+  scene.add(confusedHands);
+
   const targetWorld = new THREE.Vector3();
   const fromWorld = new THREE.Vector3();
   const toWorld = new THREE.Vector3();
@@ -1180,6 +1242,7 @@ try {
   };
   let guided = !reduceMotion;
   let guidedElapsedSeconds = 0;
+  let guidePowerRecovery = null;
   let lastActivityAt = performance.now();
   let lastFrameAt = performance.now();
   let lastRenderedAt = Number.NEGATIVE_INFINITY;
@@ -1206,9 +1269,59 @@ try {
   let lastShadowMode = "";
   const lastShadowPose = [];
 
+  function updatePowerPresentation(time) {
+    const elapsed = Math.max(0, time - desktopPowerChangedAt);
+    let screenTint = 0xffffff;
+    let buttonColor = 0x252932;
+    let emissiveColor = 0x000000;
+    let emissiveIntensity = 0;
+    let indicatorColor = 0x697180;
+    let indicatorOpacity = 0.42;
+
+    if (desktopPowerState === "off") {
+      const blinkWave = 0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2 / 1100 - Math.PI / 2);
+      const blink = Math.round(Math.pow(blinkWave, 3.2) * 6) / 6;
+      screenTint = 0x000000;
+      buttonColor = 0x31080d;
+      emissiveColor = 0xff1737;
+      emissiveIntensity = 0.12 + blink * 2.7;
+      indicatorColor = 0xff3852;
+      indicatorOpacity = 0.34 + blink * 0.66;
+    } else if (desktopPowerState === "sleep") {
+      const breathWave = 0.5 + 0.5 * Math.sin(elapsed * Math.PI * 2 / 3400 - Math.PI / 2);
+      const breath = Math.round(breathWave * 8) / 8;
+      screenTint = 0x363941;
+      buttonColor = 0x2c2023;
+      emissiveColor = 0xc9434f;
+      emissiveIntensity = 0.08 + breath * 0.72;
+      indicatorColor = 0xff6b73;
+      indicatorOpacity = 0.28 + breath * 0.5;
+    }
+
+    const presentationChanged = powerPresentationDirty
+      || screenMaterial.color.getHex() !== screenTint
+      || powerButtonMaterial.color.getHex() !== buttonColor
+      || powerButtonMaterial.emissive.getHex() !== emissiveColor
+      || Math.abs(powerButtonMaterial.emissiveIntensity - emissiveIntensity) > 0.001
+      || powerIndicatorMaterial.color.getHex() !== indicatorColor
+      || Math.abs(powerIndicatorMaterial.opacity - indicatorOpacity) > 0.001;
+    if (!presentationChanged) return false;
+
+    screenMaterial.color.setHex(screenTint);
+    powerButtonMaterial.color.setHex(buttonColor);
+    powerButtonMaterial.emissive.setHex(emissiveColor);
+    powerButtonMaterial.emissiveIntensity = emissiveIntensity;
+    powerIndicatorMaterial.color.setHex(indicatorColor);
+    powerIndicatorMaterial.opacity = indicatorOpacity;
+    powerPresentationDirty = false;
+    renderDirty = true;
+    return true;
+  }
+
   function applyMode(mode) {
     currentMode = mode;
     demo.dataset.mode = mode;
+    ui.setDeviceMode(mode);
     stand.visible = mode === "stand";
     wallMount.visible = mode === "wall";
     monitorStand.visible = mode === "monitor";
@@ -1270,6 +1383,9 @@ try {
     }
     guided = !reduceMotion;
     guidedElapsedSeconds = 0;
+    guidePowerRecovery = guided && frozenTime === null && desktopPowerState !== "on"
+      ? { elapsedSeconds: 0, pressed: false }
+      : null;
     physicalProgress = 0;
     physicalTarget = 0;
     contentProgress = 0;
@@ -1305,6 +1421,7 @@ try {
 
   function enterInteractive(preserveGuideState = false) {
     guided = false;
+    guidePowerRecovery = null;
     if (preserveGuideState) {
       physicalProgress = clamp(-display.rotation.z / (Math.PI / 2));
       contentProgress = guidedContentProgress;
@@ -1320,6 +1437,7 @@ try {
     settingsVisibleUntil = 0;
     pointer.visible = false;
     grip.visible = false;
+    confusedHands.visible = false;
     lastActivityAt = performance.now();
     demo.classList.add("is-interactive");
     setPhase("interactive", "interactive");
@@ -1403,6 +1521,16 @@ try {
     return occluder && occluder.distance + 0.02 < hit.distance ? null : hit;
   }
 
+  function getPowerButtonPickFromRay() {
+    const hit = raycaster.intersectObject(powerButtonHit, false)[0];
+    if (!hit) return null;
+    const occluder = raycaster.intersectObjects(
+      [chassis, rearShell, frame, screenInteriorHit],
+      false
+    )[0];
+    return occluder && occluder.distance + 0.002 < hit.distance ? null : hit;
+  }
+
   function getEdgePick(event) {
     setRayFromEvent(event);
     const hit = raycaster.intersectObject(edgeHit, false)[0];
@@ -1463,7 +1591,11 @@ try {
 
   function findAction(event) {
     setRayFromEvent(event);
-    if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
+    if (desktopPowerState === "on"
+      && bubbleVisible
+      && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
+    if (currentMode !== "monitor" && raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
+    if (getPowerButtonPickFromRay()) return "power";
     if (currentMode === "monitor") {
       if (getPendulumPickFromRay()) return "pendulum";
       if (getFloorLightPickFromRay()) return "floor-light";
@@ -1472,7 +1604,6 @@ try {
       if (raycaster.intersectObject(screenInteriorHit, false).length > 0) return null;
       return raycaster.intersectObject(stage, false).length > 0 ? "orbit" : null;
     }
-    if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
     if (getPendulumPickFromRay()) return "pendulum";
     if (getFloorLightPickFromRay()) return "floor-light";
     const displayAction = getDisplaySurfaceActionFromRay();
@@ -2134,11 +2265,19 @@ try {
       orbitState = null;
       demo.classList.remove("is-orbiting");
       releaseDragCursor(event);
+    } else if (pressedAction === "power" && findAction(event) === "power") {
+      ui.pressPowerButton();
+      bubbleVisible = false;
+      settingsVisibleUntil = 0;
+      updateInteractiveCaption();
     } else if (pressedAction === "floor-light" && findAction(event) === "floor-light") {
       floorLightTarget = floorLightTarget > 0.5 ? 0 : 1;
       demo.dataset.floorLight = floorLightTarget > 0.5 ? "on" : "off";
     } else if (pressedAction === "trigger" && findAction(event) === "trigger") {
-      if (currentMode === "monitor") {
+      if (desktopPowerState !== "on") {
+        bubbleVisible = false;
+        settingsVisibleUntil = 0;
+      } else if (currentMode === "monitor") {
         const next = Math.max(contentTarget, physicalTarget, contentProgress, physicalProgress) > 0.5 ? 0 : 1;
         contentTarget = next;
         physicalTarget = next;
@@ -2241,19 +2380,114 @@ try {
       || time - lastRenderedAt >= 1000;
   }
 
+  function renderGuidePowerRecovery(time) {
+    const recovery = guidePowerRecovery;
+    if (!recovery) return false;
+
+    const recoveryTime = recovery.elapsedSeconds;
+    display.rotation.z = 0;
+    guidedContentProgress = 0;
+    updateDesktopOrientation(0);
+    ui.setSwivelOverlay({ visible: false, progress: 0, scale: 0.25, settingsVisible: false });
+    ui.draw(time);
+    bubbleMaterial.opacity = 0;
+    bubbleGroup.visible = false;
+    settingsMaterial.opacity = 0;
+    settingsBubble.visible = false;
+    grip.visible = false;
+
+    if (recoveryTime < 1.28) {
+      setPhase("power-confused");
+      pointer.visible = false;
+      const opacity = segment(recoveryTime, 0, 0.28) * (1 - segment(recoveryTime, 0.96, 1.26));
+      confusedHands.position.copy(getWorldPosition(new THREE.Vector3(0.72, -0.72, 0.58)));
+      confusedHandsMaterial.opacity = opacity;
+      confusedHands.visible = opacity > 0.002;
+    } else {
+      setPhase(recovery.pressed ? "power-restarting" : "power-button");
+      confusedHands.visible = false;
+      const press = segment(recoveryTime, 2.28, 2.53) * (1 - segment(recoveryTime, 2.53, 2.8));
+      const pointerOpacity = segment(recoveryTime, 1.3, 1.55) * (1 - segment(recoveryTime, 2.86, 3.14));
+      const powerTarget = new THREE.Vector3();
+      powerButton.getWorldPosition(powerTarget);
+      const pointerStart = getWorldPosition(new THREE.Vector3(0.72, -0.3, 0.56));
+      const pointerEnd = getPointerPosition(powerTarget, 0, press, true);
+      targetWorld.lerpVectors(pointerStart, pointerEnd, segment(recoveryTime, 1.34, 2.18));
+      placePointer(targetWorld, 0, pointerOpacity, press);
+    }
+
+    if (!recovery.pressed && recoveryTime >= 2.53) {
+      const frameState = ui.getFrameState();
+      if (frameState.systemActivity === "idle") {
+        if (frameState.powerState !== "on") ui.pressPowerButton();
+        recovery.pressed = true;
+      }
+    }
+
+    const frameState = ui.getFrameState();
+    if (recovery.pressed
+      && recoveryTime >= 3.16
+      && frameState.powerState === "on"
+      && frameState.systemActivity === "idle") {
+      guidePowerRecovery = null;
+      guidedElapsedSeconds = 0;
+      pointer.visible = false;
+      confusedHands.visible = false;
+      setPhase("guided");
+      renderDirty = true;
+      return false;
+    }
+
+    updateReflectionUniforms();
+    renderScene(time);
+    scheduleFrame(animate);
+    return true;
+  }
+
   function animate(time) {
     animationFrame = 0;
     if (loopPaused || disposed) return;
     const deltaSeconds = Math.min(0.05, Math.max(0, (time - lastFrameAt) / 1000));
     lastFrameAt = time;
-    if (guided && frozenTime === null) guidedElapsedSeconds += deltaSeconds;
+    const desktopFrameState = ui.getFrameState();
+    if (guided
+      && frozenTime === null
+      && !guidePowerRecovery
+      && desktopFrameState.powerState !== "on") {
+      guidePowerRecovery = { elapsedSeconds: 0, pressed: false };
+      guidedElapsedSeconds = 0;
+    }
+    if (guided && frozenTime === null) {
+      if (guidePowerRecovery) guidePowerRecovery.elapsedSeconds += deltaSeconds;
+      else if (desktopFrameState.systemActivity === "idle") guidedElapsedSeconds += deltaSeconds;
+    }
     camera.position.lerp(cameraGoal, 1 - Math.exp(-deltaSeconds * 7));
     camera.lookAt(cameraLook);
     updatePendulum(deltaSeconds);
     updateFloorLight(deltaSeconds);
+    updatePowerPresentation(time);
 
     if (!guided && time - lastActivityAt >= 20000) {
       restartGuide("Need a hand? Here it comes.");
+    }
+
+    if (guided && renderGuidePowerRecovery(time)) return;
+
+    if (guided && desktopFrameState.systemActivity !== "idle") {
+      display.rotation.z = 0;
+      guidedContentProgress = 0;
+      updateDesktopOrientation(0);
+      ui.setSwivelOverlay({ visible: false, progress: 0, scale: 0.25, settingsVisible: false });
+      ui.draw(time);
+      bubbleGroup.visible = false;
+      settingsBubble.visible = false;
+      pointer.visible = false;
+      grip.visible = false;
+      confusedHands.visible = false;
+      updateReflectionUniforms();
+      renderScene(time);
+      scheduleFrame(animate);
+      return;
     }
 
     if (!guided) {
@@ -2285,10 +2519,10 @@ try {
       if (pendulumDragState) updatePendulumDragVisual();
       updateDesktopOrientation(contentProgress);
       ui.setSwivelOverlay({
-        visible: bubbleVisible,
+        visible: desktopPowerState === "on" && bubbleVisible,
         progress: bubbleProgress,
         scale: 1,
-        settingsVisible: settingsOpacity > 0
+        settingsVisible: desktopPowerState === "on" && settingsOpacity > 0
       });
       const uiPresented = ui.draw(time);
       bubbleGroup.rotation.z = -display.rotation.z;
@@ -2301,6 +2535,7 @@ try {
       if (settingsWereVisible !== settingsBubble.visible) renderDirty = true;
       pointer.visible = false;
       grip.visible = false;
+      confusedHands.visible = false;
       if (uiPresented || interactiveSceneIsMoving(time)) {
         updateReflectionUniforms();
         renderScene(time);
@@ -2310,6 +2545,7 @@ try {
     }
 
     const t = frozenTime ?? guidedElapsedSeconds;
+    confusedHands.visible = false;
     let panelAngle = 0;
     let contentAngle = 0;
     let bubbleOpacity = 0;
@@ -2464,7 +2700,7 @@ try {
     display.rotation.z = panelAngle;
     updateDesktopOrientation(contentAngle / (Math.PI / 2));
     ui.setSwivelOverlay({
-      visible: bubbleOpacity > 0.002,
+      visible: desktopPowerState === "on" && bubbleOpacity > 0.002,
       progress: bubbleProgress,
       scale: bubbleScale,
       settingsVisible: false
@@ -2641,7 +2877,7 @@ try {
     monitorStand.visible = savedVisibility.monitor;
     stage.visible = savedVisibility.stage;
     reader.visible = savedVisibility.reader;
-    applyMode(initialMode);
+    applyMode(currentMode);
   }
 
   document.addEventListener("visibilitychange", documentVisibilityHandler);

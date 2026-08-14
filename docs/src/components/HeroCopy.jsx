@@ -33,7 +33,7 @@ function GitHubIcon() {
 export function HeroCopy({ openModal }) {
   return (
     <div className="hero-copy relative z-2 min-w-0">
-      <h1 id="hero-title">The screen turns.<br />Windows doesn&apos;t.<br /><em>Swivel fixes that.</em></h1>
+      <h1 id="hero-title">The screen turns.<br />Your desktop doesn&apos;t.<br /><em>Swivel fixes that.</em></h1>
       <p className="lede">Touch the side reader, tap the blue button, then turn the display. Swivel skips the Settings scavenger hunt. Free, tiny, one job.</p>
 
       <div className="downloads flex" aria-label="Download choices">
