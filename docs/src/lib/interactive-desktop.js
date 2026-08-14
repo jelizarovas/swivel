@@ -12,15 +12,27 @@ const ANIMALS = [
 ];
 
 const BOARD_COLORS = ["#10131d", "#5f74ed", "#ef6a76", "#15a47b", "#f5b942"];
+const TOUCH_TRAIL_LIFETIME = 260;
+const TOUCH_RIPPLE_LIFETIME = 420;
+
+function createLayoutSurface(width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return { canvas, context: canvas.getContext("2d") };
+}
 
 export function createInteractiveDesktopTexture({ onRotationRequest, quality = "balanced" } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
   canvas.height = 720;
   const presentationContext = canvas.getContext("2d");
-  const layoutCanvas = document.createElement("canvas");
-  const context = layoutCanvas.getContext("2d");
-  if (!presentationContext || !context) {
+  const layoutSurfaces = {
+    landscape: createLayoutSurface(1280, 720),
+    portrait: createLayoutSurface(720, 1280)
+  };
+  let { canvas: layoutCanvas, context } = layoutSurfaces.landscape;
+  if (!presentationContext || !context || !layoutSurfaces.portrait.context) {
     throw new Error("Interactive desktop requires a 2D canvas context.");
   }
 
@@ -42,6 +54,9 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     likedAnimals: new Set(),
     videoPlaying: true,
     adVariant: 0,
+    touchPointer: null,
+    touchTrail: [],
+    touchRipples: [],
     lastDrawTime: 0,
     disposed: false
   };
@@ -59,9 +74,17 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
   }[quality] ?? { ambient: 1000 / 18, video: 1000 / 24, gesture: 1000 / 30 };
 
   function animationInterval() {
+    if (state.activePointer || state.touchPointer || state.touchTrail.length || state.touchRipples.length) {
+      return cadence.gesture;
+    }
     if (state.mode === "video" && state.videoPlaying) return cadence.video;
     if (state.mode === "desktop" || state.mode === "feed") return cadence.ambient;
     return Number.POSITIVE_INFINITY;
+  }
+
+  function getPreferredFrameInterval() {
+    if (state.disposed) return Number.POSITIVE_INFINITY;
+    return animationInterval();
   }
 
   function drawGesture() {
@@ -70,14 +93,83 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     return draw(performance.now());
   }
 
+  function normalizeTouchPoint(point, time = performance.now()) {
+    return {
+      x: clampNumber(point.x / layout.width, 0, 1),
+      y: clampNumber(point.y / layout.height, 0, 1),
+      time
+    };
+  }
+
+  function beginTouchFeedback(pointerId, point) {
+    const touchPoint = normalizeTouchPoint(point);
+    state.touchPointer = {
+      pointerId,
+      startX: point.x,
+      startY: point.y,
+      moved: 0
+    };
+    state.touchTrail.length = 0;
+    state.touchTrail.push(touchPoint);
+  }
+
+  function appendTouchPoint(point) {
+    const touchPoint = normalizeTouchPoint(point);
+    const previous = state.touchTrail[state.touchTrail.length - 1];
+    const distance = previous
+      ? Math.hypot((touchPoint.x - previous.x) * layout.width, (touchPoint.y - previous.y) * layout.height)
+      : Number.POSITIVE_INFINITY;
+    if (distance >= 2) state.touchTrail.push(touchPoint);
+    if (state.touchTrail.length > 20) state.touchTrail.splice(0, state.touchTrail.length - 20);
+    if (state.touchPointer) {
+      state.touchPointer.moved = Math.max(
+        state.touchPointer.moved,
+        Math.hypot(point.x - state.touchPointer.startX, point.y - state.touchPointer.startY)
+      );
+    }
+  }
+
+  function finishTouchFeedback(point) {
+    const touchPoint = normalizeTouchPoint(point);
+    appendTouchPoint(point);
+    if ((state.touchPointer?.moved ?? 0) < 12) {
+      state.touchRipples.push({ ...touchPoint, startedAt: touchPoint.time });
+      if (state.touchRipples.length > 4) state.touchRipples.shift();
+    }
+    state.touchPointer = null;
+  }
+
+  function cancelTouchFeedback() {
+    state.touchPointer = null;
+    state.touchTrail.length = 0;
+  }
+
   function setOrientation(nextOrientation) {
     const normalized = typeof nextOrientation === "boolean"
       ? (nextOrientation ? "portrait" : "landscape")
       : nextOrientation;
     if (!ORIENTATIONS.has(normalized) || normalized === state.orientation) return false;
     state.orientation = normalized;
-    resizeCanvas();
+    activateLayoutSurface(normalized);
     draw();
+    return true;
+  }
+
+  function activateLayoutSurface(orientation) {
+    ({ canvas: layoutCanvas, context } = layoutSurfaces[orientation]);
+  }
+
+  function prewarm() {
+    if (state.disposed) return false;
+    const originalOrientation = state.orientation;
+    const alternateOrientation = originalOrientation === "portrait" ? "landscape" : "portrait";
+    for (const orientation of [alternateOrientation, originalOrientation]) {
+      state.orientation = orientation;
+      activateLayoutSurface(orientation);
+      dirty = true;
+      dirtyInterval = 0;
+      draw();
+    }
     return true;
   }
 
@@ -87,16 +179,6 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     state.startOpen = false;
     draw();
     return true;
-  }
-
-  function resizeCanvas() {
-    const portrait = state.orientation === "portrait";
-    const nextWidth = portrait ? 720 : 1280;
-    const nextHeight = portrait ? 1280 : 720;
-    if (layoutCanvas.width !== nextWidth || layoutCanvas.height !== nextHeight) {
-      layoutCanvas.width = nextWidth;
-      layoutCanvas.height = nextHeight;
-    }
   }
 
   function computeLayout() {
@@ -130,7 +212,6 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     const dirtyDue = dirty && elapsed >= dirtyInterval;
     if (!force && !animationDue && !dirtyDue) return false;
 
-    resizeCanvas();
     state.lastDrawTime = frameTime;
     layout = computeLayout();
     regions.length = 0;
@@ -142,6 +223,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     if (state.mode === "video") drawVideo(context, layout, regions, state, state.lastDrawTime);
     drawTaskbar(context, layout, regions, state);
     if (state.startOpen) drawStartMenu(context, layout, regions, state);
+    drawTouchFeedback(context, layout, state, frameTime);
     drawGlass(context, layout);
     presentFrame();
     texture.needsUpdate = true;
@@ -182,11 +264,12 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
   }
 
   function pointerDown(uv, options = {}) {
-    if (state.disposed || state.activePointer) return { handled: false };
+    if (state.disposed || state.activePointer || state.touchPointer) return { handled: false };
     ensureLayout();
     const point = uvToCanvas(uv, typeof options === "number" ? options : options.v);
     const pointerId = (typeof options === "object" ? options.pointerId : null) ?? uv?.pointerId ?? 0;
     const hit = hitTest(point);
+    beginTouchFeedback(pointerId, point);
 
     if (hit?.action === "start") {
       state.startOpen = !state.startOpen;
@@ -251,25 +334,30 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
         startOffset: state.feedOffset,
         pressedAnimal: hit.value
       };
+      draw();
       return { handled: true, action: "feed-drag" };
     }
 
+    if (hit) draw();
     return { handled: Boolean(hit), action: hit?.action ?? null };
   }
 
   function pointerMove(uv, options = {}) {
-    if (!state.activePointer || state.disposed) return { handled: false };
+    if (state.disposed) return { handled: false };
     const pointerId = (typeof options === "object" ? options.pointerId : null) ?? uv?.pointerId ?? 0;
-    if (pointerId !== state.activePointer.pointerId) return { handled: false };
+    const ownsAppPointer = state.activePointer?.pointerId === pointerId;
+    const ownsTouchPointer = state.touchPointer?.pointerId === pointerId;
+    if (!ownsAppPointer && !ownsTouchPointer) return { handled: false };
     const point = uvToCanvas(uv, typeof options === "number" ? options : options.v);
+    if (ownsTouchPointer) appendTouchPoint(point);
 
-    if (state.activePointer.type === "board") {
+    if (ownsAppPointer && state.activePointer.type === "board") {
       appendBoardPoint(state.activePointer.stroke, point, state.activePointer.rect);
       drawGesture();
       return { handled: true, action: "board-draw" };
     }
 
-    if (state.activePointer.type === "feed") {
+    if (ownsAppPointer && state.activePointer.type === "feed") {
       const delta = point.y - state.activePointer.lastY;
       state.activePointer.moved += Math.abs(delta);
       state.feedOffset -= delta;
@@ -277,13 +365,24 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
       drawGesture();
       return { handled: true, action: "feed-scroll" };
     }
-    return { handled: false };
+    drawGesture();
+    return { handled: true, action: "touch" };
   }
 
   function pointerUp(uv, options = {}) {
-    if (!state.activePointer || state.disposed) return { handled: false };
+    if (state.disposed) return { handled: false };
     const pointerId = (typeof options === "object" ? options.pointerId : null) ?? uv?.pointerId ?? 0;
-    if (pointerId !== state.activePointer.pointerId) return { handled: false };
+    const ownsAppPointer = state.activePointer?.pointerId === pointerId;
+    const ownsTouchPointer = state.touchPointer?.pointerId === pointerId;
+    if (!ownsAppPointer && !ownsTouchPointer) return { handled: false };
+    if (ownsTouchPointer) {
+      const point = uvToCanvas(uv, typeof options === "number" ? options : options.v);
+      finishTouchFeedback(point);
+    }
+    if (!ownsAppPointer) {
+      draw();
+      return { handled: true, action: "touch" };
+    }
     const active = state.activePointer;
     state.activePointer = null;
 
@@ -298,13 +397,16 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
   }
 
   function pointerCancel(options = {}) {
-    if (!state.activePointer || state.disposed) return { handled: false };
+    if (state.disposed) return { handled: false };
     const pointerId = (typeof options === "object" ? options.pointerId : options) ?? 0;
-    if (pointerId !== state.activePointer.pointerId) return { handled: false };
-    const active = state.activePointer;
-    state.activePointer = null;
+    const ownsAppPointer = state.activePointer?.pointerId === pointerId;
+    const ownsTouchPointer = state.touchPointer?.pointerId === pointerId;
+    if (!ownsAppPointer && !ownsTouchPointer) return { handled: false };
+    const active = ownsAppPointer ? state.activePointer : null;
+    if (ownsAppPointer) state.activePointer = null;
+    if (ownsTouchPointer) cancelTouchFeedback();
     draw();
-    return { handled: true, action: active.type };
+    return { handled: true, action: active?.type ?? "touch" };
   }
 
   function wheel(uv, deltaY) {
@@ -339,12 +441,14 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
   function dispose() {
     state.disposed = true;
     state.activePointer = null;
+    state.touchPointer = null;
+    state.touchTrail.length = 0;
+    state.touchRipples.length = 0;
     state.boardStrokes.length = 0;
     regions.length = 0;
     texture.dispose();
   }
 
-  resizeCanvas();
   draw(0);
 
   return {
@@ -355,10 +459,51 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     pointerUp,
     pointerCancel,
     wheel,
+    getPreferredFrameInterval,
+    prewarm,
     setOrientation,
     setMode,
     dispose
   };
+}
+
+function drawTouchFeedback(context, layout, state, time) {
+  const liveTrail = state.touchTrail.filter((point) => time - point.time < TOUCH_TRAIL_LIFETIME);
+  const liveRipples = state.touchRipples.filter((ripple) => time - ripple.startedAt < TOUCH_RIPPLE_LIFETIME);
+  state.touchTrail.splice(0, state.touchTrail.length, ...liveTrail);
+  state.touchRipples.splice(0, state.touchRipples.length, ...liveRipples);
+
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  for (let index = 1; index < liveTrail.length; index += 1) {
+    const from = liveTrail[index - 1];
+    const to = liveTrail[index];
+    const age = Math.max(0, time - to.time);
+    const opacity = (1 - age / TOUCH_TRAIL_LIFETIME) * 0.72;
+    context.strokeStyle = `rgba(255,255,255,${opacity})`;
+    context.lineWidth = 5.5 * layout.unit;
+    context.beginPath();
+    context.moveTo(from.x * layout.width, from.y * layout.height);
+    context.lineTo(to.x * layout.width, to.y * layout.height);
+    context.stroke();
+  }
+
+  for (const ripple of liveRipples) {
+    const progress = clampNumber((time - ripple.startedAt) / TOUCH_RIPPLE_LIFETIME, 0, 1);
+    const x = ripple.x * layout.width;
+    const y = ripple.y * layout.height;
+    const radius = (13 + progress * 43) * layout.unit;
+    const opacity = (1 - progress) * 0.82;
+    context.strokeStyle = `rgba(255,255,255,${opacity})`;
+    context.lineWidth = Math.max(2, (4 - progress * 2) * layout.unit);
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.stroke();
+    context.fillStyle = `rgba(255,255,255,${opacity * 0.12})`;
+    context.fill();
+  }
+  context.restore();
 }
 
 function drawWallpaper(context, layout, time) {

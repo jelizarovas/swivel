@@ -16,11 +16,19 @@ const frozenTime = Number.isFinite(requestedTime) ? requestedTime : null;
 const requestedMode = new URLSearchParams(window.location.search).get("mode");
 let renderer = null;
 let observer = null;
+let visibilityObserver = null;
 let animationFrame = 0;
 let disposed = false;
 let disposeUi = null;
+let documentVisibilityHandler = null;
+let loopPaused = false;
+let documentVisible = !document.hidden;
+let demoVisible = true;
+let pausedAt = 0;
 const scheduleFrame = (callback) => {
-  if (!disposed) animationFrame = requestAnimationFrame(callback);
+  if (!disposed && !loopPaused && animationFrame === 0) {
+    animationFrame = requestAnimationFrame(callback);
+  }
 };
 
 if (!canvas || !demo) {
@@ -217,6 +225,8 @@ try {
   renderer.toneMappingExposure = 0.94;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-5.8, 5.8, 5.8, -5.8, 0.1, 100);
@@ -295,7 +305,7 @@ try {
   });
   const pendantAnchor = new THREE.Vector3(-4.45, 8.55, 3.2);
   const pendantLength = 5.18;
-  const pendantRestDirection = new THREE.Vector3(0.052, -0.997, 0.054).normalize();
+  const pendantRestDirection = new THREE.Vector3(0, -1, 0);
   const pendantDirection = pendantRestDirection.clone();
   const pendantOmega = new THREE.Vector3();
   const pendantGroup = new THREE.Group();
@@ -491,11 +501,13 @@ try {
   sceneRig.add(floorBulbFlare);
 
   const stand = new THREE.Group();
+  const standUpperLift = 0.65;
+  const standDisplayHeight = 1.75 + standUpperLift;
   const legSpecs = [
-    [new THREE.Vector3(-1.48, 1.68, 0.12), new THREE.Vector3(-2.12, -2.36, 0.68)],
-    [new THREE.Vector3(1.48, 1.68, 0.12), new THREE.Vector3(2.12, -2.36, 0.68)],
-    [new THREE.Vector3(-1.4, 1.58, -0.3), new THREE.Vector3(-1.62, -2.36, -0.72)],
-    [new THREE.Vector3(1.4, 1.58, -0.3), new THREE.Vector3(1.62, -2.36, -0.72)]
+    [new THREE.Vector3(-1.48, 1.68 + standUpperLift, 0.12), new THREE.Vector3(-2.12, -2.36, 0.68)],
+    [new THREE.Vector3(1.48, 1.68 + standUpperLift, 0.12), new THREE.Vector3(2.12, -2.36, 0.68)],
+    [new THREE.Vector3(-1.4, 1.58 + standUpperLift, -0.3), new THREE.Vector3(-1.62, -2.36, -0.72)],
+    [new THREE.Vector3(1.4, 1.58 + standUpperLift, -0.3), new THREE.Vector3(1.62, -2.36, -0.72)]
   ];
   for (const [top, bottom] of legSpecs) {
     stand.add(cylinderBetween(top, bottom, 0.075, whiteMetal, 24));
@@ -523,7 +535,7 @@ try {
 
   for (const x of [-1.44, 1.44]) {
     const hinge = new THREE.Group();
-    hinge.position.set(x, 1.6, -0.03);
+    hinge.position.set(x, 1.6 + standUpperLift, -0.03);
     const hingeBody = new THREE.Mesh(roundedSolid(0.34, 0.46, 0.14, 0.34, 0.035), whitePlastic);
     hingeBody.castShadow = true;
     hinge.add(hingeBody);
@@ -601,25 +613,25 @@ try {
   mountAssembly.add(mountFace);
   for (const x of [-1.34, 1.34]) {
     stand.add(cylinderBetween(
-      new THREE.Vector3(x, 1.56, 0.02),
-      new THREE.Vector3(x * 0.92, 1.56, 0.31),
+      new THREE.Vector3(x, 1.56 + standUpperLift, 0.02),
+      new THREE.Vector3(x * 0.92, 1.56 + standUpperLift, 0.31),
       0.082,
       whiteMetal,
       18));
   }
 
   stand.add(tubeAlong([
-    new THREE.Vector3(0.46, 0.4, 0.23),
-    new THREE.Vector3(0.72, 0.18, 0.18),
-    new THREE.Vector3(0.76, -0.14, 0.12),
-    new THREE.Vector3(0.67, -0.7, 0.06),
+    new THREE.Vector3(0.46, 1.05, 0.23),
+    new THREE.Vector3(0.72, 0.63, 0.18),
+    new THREE.Vector3(0.76, 0.1, 0.12),
+    new THREE.Vector3(0.67, -0.6, 0.06),
     new THREE.Vector3(0.48, -0.95, 0.02)
   ], 0.025, cableDark));
   stand.add(tubeAlong([
-    new THREE.Vector3(0.72, 0.48, 0.24),
-    new THREE.Vector3(0.9, 0.24, 0.19),
-    new THREE.Vector3(0.88, -0.08, 0.13),
-    new THREE.Vector3(0.76, -0.64, 0.07),
+    new THREE.Vector3(0.72, 1.13, 0.24),
+    new THREE.Vector3(0.9, 0.69, 0.19),
+    new THREE.Vector3(0.88, 0.16, 0.13),
+    new THREE.Vector3(0.76, -0.54, 0.07),
     new THREE.Vector3(0.62, -0.91, 0.03)
   ], 0.019, cableLight));
   sceneRig.add(stand);
@@ -691,7 +703,7 @@ try {
   // Pitch the panel back around its horizontal axis. The camera supplies the
   // isometric side view; the screen itself stays square to its physical mount.
   const displayMount = new THREE.Group();
-  displayMount.position.set(0, 1.75, 0.82);
+  displayMount.position.set(0, standDisplayHeight, 0.82);
   displayMount.rotation.x = -0.14;
   sceneRig.add(displayMount);
 
@@ -901,11 +913,12 @@ try {
     map: buttonTexture,
     transparent: true,
     opacity: 0,
-    depthTest: false,
+    depthTest: true,
+    depthWrite: false,
     toneMapped: false
   });
   const bubbleGroup = new THREE.Group();
-  bubbleGroup.position.set(2.6, 0, 0.265);
+  bubbleGroup.position.set(2.6, 0, 0.252);
   bubbleGroup.renderOrder = 10;
   display.add(bubbleGroup);
 
@@ -922,12 +935,12 @@ try {
   const ringGeometry = new THREE.BufferGeometry().setFromPoints(ringPoints);
   const ringBackground = new THREE.Line(
     ringGeometry.clone(),
-    new THREE.LineBasicMaterial({ color: 0x26345f, transparent: true, opacity: 0.35, depthTest: false }));
+    new THREE.LineBasicMaterial({ color: 0x26345f, transparent: true, opacity: 0.35, depthTest: true, depthWrite: false }));
   ringBackground.renderOrder = 11;
   bubbleGroup.add(ringBackground);
   const ringProgress = new THREE.Line(
     ringGeometry,
-    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false }));
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: true, depthWrite: false }));
   ringProgress.geometry.setDrawRange(0, 1);
   ringProgress.renderOrder = 12;
   bubbleGroup.add(ringProgress);
@@ -936,11 +949,12 @@ try {
     map: createLabelTexture("Open settings"),
     transparent: true,
     opacity: 0,
-    depthTest: false,
+    depthTest: true,
+    depthWrite: false,
     toneMapped: false
   });
   const settingsBubble = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 0.51), settingsMaterial);
-  settingsBubble.position.set(0, -0.72, 0.014);
+  settingsBubble.position.set(0, -0.47, 0.014);
   settingsBubble.renderOrder = 13;
   bubbleGroup.add(settingsBubble);
 
@@ -1034,9 +1048,10 @@ try {
   let stageOffsetX = 0;
   let currentMode = "stand";
   let guided = !reduceMotion;
-  let guidedStartedAt = performance.now();
+  let guidedElapsedSeconds = 0;
   let lastActivityAt = performance.now();
   let lastFrameAt = performance.now();
+  let lastRenderedAt = Number.NEGATIVE_INFINITY;
   let physicalProgress = 0;
   let physicalTarget = 0;
   let contentProgress = 0;
@@ -1055,6 +1070,10 @@ try {
   let desktopPointerState = null;
   let orbitState = null;
   let guidedContentProgress = 0;
+  let renderDirty = true;
+  let shadowDirty = true;
+  let lastShadowMode = "";
+  const lastShadowPose = [];
 
   function applyMode(mode) {
     currentMode = mode;
@@ -1080,7 +1099,7 @@ try {
       cameraGoal.set(6.8, 4.8, 11.8);
       cameraLook.set(0, 0.1, 0);
     } else {
-      displayMount.position.set(0, 1.75, 0.82);
+      displayMount.position.set(0, standDisplayHeight, 0.82);
       displayMount.rotation.x = -0.14;
       display.scale.setScalar(1);
       cameraGoal.set(7.2, 5.4, 11.5);
@@ -1092,6 +1111,8 @@ try {
     for (const button of modeButtons) {
       button.setAttribute("aria-selected", String(button.dataset.demoMode === mode));
     }
+    renderDirty = true;
+    shadowDirty = true;
   }
 
   function updateDesktopOrientation(progress) {
@@ -1116,7 +1137,7 @@ try {
       ui.pointerCancel({ pointerId: desktopPointerState.pointerId });
     }
     guided = !reduceMotion;
-    guidedStartedAt = performance.now();
+    guidedElapsedSeconds = 0;
     physicalProgress = 0;
     physicalTarget = 0;
     contentProgress = 0;
@@ -1132,6 +1153,8 @@ try {
     pendantDirection.copy(pendantRestDirection);
     orbitState = null;
     sceneRig.rotation.y = 0;
+    renderDirty = true;
+    shadowDirty = true;
     demo.classList.remove(
       "is-interactive",
       "is-dragging",
@@ -1280,22 +1303,33 @@ try {
     return { hit: null, uv: rawUv.applyMatrix3(ui.texture.matrix) };
   }
 
+  function getDisplaySurfaceActionFromRay() {
+    const desktopPick = getDesktopPickFromRay();
+    const bezelPick = raycaster.intersectObject(edgeHit, false)[0];
+    if (!desktopPick) return bezelPick ? "edge" : null;
+    if (!bezelPick) return "desktop";
+    // The invisible interaction surfaces meet at the screen/bezel seam. Let
+    // the physically nearest surface win so a visible bezel remains draggable
+    // without turning the outermost screen pixels into a grab handle.
+    return bezelPick.distance + 0.002 < desktopPick.hit.distance ? "edge" : "desktop";
+  }
+
   function findAction(event) {
     setRayFromEvent(event);
     if (bubbleVisible && raycaster.intersectObject(bubble, false).length > 0) return "bubble";
     if (currentMode === "monitor") {
-      if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
       if (getPendulumPickFromRay()) return "pendulum";
       if (getFloorLightPickFromRay()) return "floor-light";
-      if (getDesktopPickFromRay()) return "desktop";
+      const displayAction = getDisplaySurfaceActionFromRay();
+      if (displayAction) return displayAction;
       if (raycaster.intersectObject(screenInteriorHit, false).length > 0) return null;
       return raycaster.intersectObject(stage, false).length > 0 ? "orbit" : null;
     }
     if (raycaster.intersectObject(readerHit, false).length > 0) return "trigger";
-    if (raycaster.intersectObject(edgeHit, false).length > 0) return "edge";
     if (getPendulumPickFromRay()) return "pendulum";
     if (getFloorLightPickFromRay()) return "floor-light";
-    if (getDesktopPickFromRay()) return "desktop";
+    const displayAction = getDisplaySurfaceActionFromRay();
+    if (displayAction) return displayAction;
     if (raycaster.intersectObject(screenInteriorHit, false).length > 0) return null;
     if (currentMode !== "wall" && raycaster.intersectObject(stage, false).length > 0) return "orbit";
     return null;
@@ -1557,8 +1591,18 @@ try {
       * Math.max(0, Math.abs(tangentialForce) - 6);
     const dragDistance = Math.max(180, canvas.getBoundingClientRect().height * 0.42);
     const velocity = clamp(effectiveForce / dragDistance * 9.5, -2.75, 2.75);
+    const previousPhysicalProgress = physicalProgress;
     physicalProgress = clamp(physicalProgress + velocity * deltaSeconds);
     physicalTarget = physicalProgress;
+    const physicalMovement = physicalProgress - previousPhysicalProgress;
+    if (Math.abs(physicalMovement) > 0.000001 && dragState.syncContentWithPhysical) {
+      // A direct hardware turn acts like a gyro replacement: the responsive
+      // desktop follows the panel's real position, including reversals. If the
+      // bubble already requested the opposite orientation, preserve that
+      // deliberate pixels-first sequence while the user turns the panel.
+      contentProgress = physicalProgress;
+      contentTarget = physicalProgress;
+    }
     dragState.velocity = velocity;
   }
 
@@ -1669,7 +1713,10 @@ try {
 
   function cancelActivePointer(event) {
     if (pressedPointerId === null || event.pointerId !== pressedPointerId) return;
-    if (dragState) physicalTarget = dragState.startProgress;
+    if (dragState) {
+      physicalTarget = dragState.startProgress;
+      contentTarget = dragState.startContentTarget;
+    }
     dragState = null;
     pendulumDragState = null;
     if (desktopPointerState) {
@@ -1687,6 +1734,7 @@ try {
     forceVector?.classList.remove("is-blocked");
     releaseDragCursor(event);
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    updateLoopPauseState();
   }
 
   canvas.addEventListener("pointerenter", () => {
@@ -1698,6 +1746,7 @@ try {
   canvas.addEventListener("pointermove", (event) => {
     if (guided) return;
     if (pressedPointerId !== null && event.pointerId !== pressedPointerId) return;
+    demo.classList.add("pointer-inside");
     noteActivity();
     const demoRect = demo.getBoundingClientRect();
     if (cursorElement && !dragState) {
@@ -1761,9 +1810,16 @@ try {
   canvas.addEventListener("pointerdown", (event) => {
     if (dragState || pendulumDragState || desktopPointerState || orbitState || pressedPointerId !== null) return;
     interruptGuide();
+    demo.classList.toggle("pointer-inside", pointerIsInsideCanvas(event));
     noteActivity();
     const action = findAction(event);
     if (action === null) return;
+    const demoRect = demo.getBoundingClientRect();
+    if (cursorElement) {
+      cursorElement.style.left = `${event.clientX - demoRect.left}px`;
+      cursorElement.style.top = `${event.clientY - demoRect.top}px`;
+    }
+    setCursorAction(action);
     pressedAction = action;
     pressedPointerId = event.pointerId;
     pressedAt = performance.now();
@@ -1775,11 +1831,12 @@ try {
         pressedPointerId = null;
         return;
       }
-      const demoRect = demo.getBoundingClientRect();
       const initialGripPoint = projectGripToDemo(edgePick.localPoint);
       dragState = {
         pointerId: event.pointerId,
         startProgress: physicalProgress,
+        startContentTarget: contentTarget,
+        syncContentWithPhysical: Math.abs(contentTarget - Math.round(physicalProgress)) < 0.001,
         pointerX: event.clientX,
         pointerY: event.clientY,
         pointerOffsetX: event.clientX - demoRect.left - initialGripPoint.x,
@@ -1907,6 +1964,7 @@ try {
     pressedPointerId = null;
     if (!pointerIsInsideCanvas(event)) demo.classList.remove("pointer-inside");
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    updateLoopPauseState();
   });
   canvas.addEventListener("pointercancel", cancelActivePointer);
   canvas.addEventListener("lostpointercapture", cancelActivePointer);
@@ -1929,12 +1987,70 @@ try {
     });
   }
 
-  applyMode(["stand", "wall", "monitor"].includes(requestedMode) ? requestedMode : "stand");
+  const initialMode = ["stand", "wall", "monitor"].includes(requestedMode) ? requestedMode : "stand";
+  applyMode(initialMode);
   if (reduceMotion) enterInteractive();
 
+  function refreshShadowInvalidation() {
+    const nextPose = [
+      display.rotation.z,
+      sceneRig.rotation.y,
+      displayMount.position.x,
+      displayMount.position.y,
+      displayMount.position.z,
+      displayMount.rotation.x,
+      displayMount.rotation.y,
+      displayMount.rotation.z,
+      display.scale.x,
+      display.scale.y,
+      display.scale.z,
+      pendantDirection.x,
+      pendantDirection.y,
+      pendantDirection.z
+    ];
+    if (lastShadowMode !== currentMode
+      || nextPose.length !== lastShadowPose.length
+      || nextPose.some((value, index) => Math.abs(value - lastShadowPose[index]) > 0.0001)) {
+      shadowDirty = true;
+      lastShadowMode = currentMode;
+      lastShadowPose.splice(0, lastShadowPose.length, ...nextPose);
+    }
+  }
+
+  function renderScene(time) {
+    refreshShadowInvalidation();
+    renderer.shadowMap.needsUpdate = shadowDirty;
+    renderer.render(scene, camera);
+    shadowDirty = false;
+    renderDirty = false;
+    lastRenderedAt = time;
+  }
+
+  function interactiveSceneIsMoving(time) {
+    const cameraMoving = camera.position.distanceToSquared(cameraGoal) > 0.00001;
+    const pendantMoving = Boolean(pendulumDragState)
+      || pendantOmega.lengthSq() > 0.000003
+      || pendantDirection.distanceToSquared(pendantRestDirection) > 0.00002;
+    return renderDirty
+      || pressedPointerId !== null
+      || Boolean(dragState || pendulumDragState || desktopPointerState || orbitState)
+      || Math.abs(physicalProgress - physicalTarget) > 0.001
+      || Math.abs(contentProgress - contentTarget) > 0.001
+      || Math.abs(floorLightLevel - floorLightTarget) > 0.001
+      || cameraMoving
+      || pendantMoving
+      || bubbleVisible
+      || settingsVisibleUntil > time
+      || time - lastActivityAt < 180
+      || time - lastRenderedAt >= 1000;
+  }
+
   function animate(time) {
+    animationFrame = 0;
+    if (loopPaused || disposed) return;
     const deltaSeconds = Math.min(0.05, Math.max(0, (time - lastFrameAt) / 1000));
     lastFrameAt = time;
+    if (guided && frozenTime === null) guidedElapsedSeconds += deltaSeconds;
     camera.position.lerp(cameraGoal, 1 - Math.exp(-deltaSeconds * 7));
     camera.lookAt(cameraLook);
     updatePendulum(deltaSeconds);
@@ -1954,6 +2070,7 @@ try {
 
       if (bubbleVisible && time - bubbleShownAt >= 4200 && settingsVisibleUntil <= time) {
         bubbleVisible = false;
+        renderDirty = true;
         updateInteractiveCaption();
       }
 
@@ -1966,11 +2083,12 @@ try {
 
       const bubbleProgress = bubbleVisible ? clamp((time - bubbleShownAt) / 4200) : 0;
       const settingsOpacity = settingsVisibleUntil > time ? 1 : 0;
+      const settingsWereVisible = settingsBubble.visible;
       display.rotation.z = mix(0, -Math.PI / 2, physicalProgress);
       if (dragState) updateDragVisual();
       if (pendulumDragState) updatePendulumDragVisual();
       updateDesktopOrientation(contentProgress);
-      ui.draw(time);
+      const uiPresented = ui.draw(time);
       bubbleGroup.rotation.z = -display.rotation.z;
       bubbleMaterial.opacity = bubbleVisible ? 1 : 0;
       bubbleGroup.scale.setScalar(bubbleVisible ? 1 : 0.25);
@@ -1978,15 +2096,18 @@ try {
       ringProgress.geometry.setDrawRange(0, Math.max(1, Math.floor(bubbleProgress * ringPoints.length)));
       settingsMaterial.opacity = settingsOpacity;
       settingsBubble.visible = settingsOpacity > 0;
+      if (settingsWereVisible !== settingsBubble.visible) renderDirty = true;
       pointer.visible = false;
       grip.visible = false;
-      updateReflectionUniforms();
-      renderer.render(scene, camera);
+      if (uiPresented || interactiveSceneIsMoving(time)) {
+        updateReflectionUniforms();
+        renderScene(time);
+      }
       scheduleFrame(animate);
       return;
     }
 
-    const t = frozenTime ?? (time - guidedStartedAt) / 1000;
+    const t = frozenTime ?? guidedElapsedSeconds;
     let panelAngle = 0;
     let contentAngle = 0;
     let bubbleOpacity = 0;
@@ -2015,13 +2136,13 @@ try {
         contentAngle = mix(0, Math.PI / 2, turn);
         panelAngle = mix(0, -Math.PI / 2, turn);
         pointerPortraitAmount = turn;
-        pointerOpacity = 1 - segment(t, 2.1, 2.55);
+        pointerOpacity = 1;
       } else if (t < 5.45) {
         setPhase("monitor-portrait", "monitor portrait");
         contentAngle = Math.PI / 2;
         panelAngle = -Math.PI / 2;
         pointerPortraitAmount = 1;
-        pointerOpacity = segment(t, 4.25, 4.75);
+        pointerOpacity = 1;
       } else if (t < 6.3) {
         setPhase("monitor-click-return", "tray click");
         contentAngle = Math.PI / 2;
@@ -2034,7 +2155,7 @@ try {
         contentAngle = mix(Math.PI / 2, 0, turn);
         panelAngle = mix(-Math.PI / 2, 0, turn);
         pointerPortraitAmount = 1 - turn;
-        pointerOpacity = 1 - segment(t, 6.3, 6.75);
+        pointerOpacity = 1;
       } else if (frozenTime === null) {
         enterInteractive();
         scheduleFrame(animate);
@@ -2177,7 +2298,7 @@ try {
     }
 
     updateReflectionUniforms();
-    renderer.render(scene, camera);
+    renderScene(time);
     scheduleFrame(animate);
   }
 
@@ -2201,11 +2322,123 @@ try {
     cameraGoal.x += stageOffsetX - previousOffset;
     cameraLook.x = stageOffsetX;
     renderer.setSize(width, height, false);
+    renderDirty = true;
   }
+
+  function clearActivePointerForPause() {
+    const pointerId = pressedPointerId;
+    if (dragState) {
+      physicalTarget = dragState.startProgress;
+      contentTarget = dragState.startContentTarget;
+    }
+    if (desktopPointerState && !desktopPointerState.cancelled) {
+      ui.pointerCancel({ pointerId: desktopPointerState.pointerId });
+    }
+    dragState = null;
+    pendulumDragState = null;
+    desktopPointerState = null;
+    orbitState = null;
+    pendantOmega.set(0, 0, 0);
+    pressedAction = null;
+    pressedPointerId = null;
+    bubbleHoldTriggered = false;
+    demo.classList.remove(
+      "is-dragging",
+      "is-orbiting",
+      "is-light-dragging",
+      "pointer-inside"
+    );
+    forceVector?.classList.remove("is-blocked");
+    if (pointerId !== null && canvas.hasPointerCapture(pointerId)) {
+      canvas.releasePointerCapture(pointerId);
+    }
+  }
+
+  function setLoopPaused(nextPaused, cancelPointer = false) {
+    if (nextPaused === loopPaused) return;
+    if (nextPaused) {
+      if (cancelPointer) clearActivePointerForPause();
+      loopPaused = true;
+      pausedAt = performance.now();
+      if (animationFrame !== 0) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+      }
+      return;
+    }
+
+    const now = performance.now();
+    const pausedDuration = pausedAt > 0 ? now - pausedAt : 0;
+    if (bubbleVisible) bubbleShownAt += pausedDuration;
+    if (settingsVisibleUntil > pausedAt) settingsVisibleUntil += pausedDuration;
+    lastActivityAt += pausedDuration;
+    lastFrameAt = now;
+    pausedAt = 0;
+    loopPaused = false;
+    renderDirty = true;
+    shadowDirty = true;
+    resize();
+    scheduleFrame(animate);
+  }
+
+  function updateLoopPauseState() {
+    if (!documentVisible) {
+      setLoopPaused(true, true);
+      return;
+    }
+    if (!demoVisible && pressedPointerId !== null) {
+      return;
+    }
+    setLoopPaused(!demoVisible);
+  }
+
+  documentVisibilityHandler = () => {
+    documentVisible = !document.hidden;
+    updateLoopPauseState();
+  };
 
   observer = new ResizeObserver(resize);
   observer.observe(demo);
   resize();
+
+  ui.prewarm?.();
+  const savedVisibility = {
+    stand: stand.visible,
+    wall: wallMount.visible,
+    monitor: monitorStand.visible,
+    stage: stage.visible,
+    reader: reader.visible
+  };
+  stand.visible = true;
+  wallMount.visible = true;
+  monitorStand.visible = true;
+  stage.visible = true;
+  reader.visible = true;
+  try {
+    if (typeof renderer.compileAsync === "function") {
+      await renderer.compileAsync(scene, camera);
+    } else {
+      renderer.compile(scene, camera);
+    }
+  } catch (error) {
+    console.debug("Swivel shader prewarm was skipped.", error);
+  } finally {
+    stand.visible = savedVisibility.stand;
+    wallMount.visible = savedVisibility.wall;
+    monitorStand.visible = savedVisibility.monitor;
+    stage.visible = savedVisibility.stage;
+    reader.visible = savedVisibility.reader;
+    applyMode(initialMode);
+  }
+
+  document.addEventListener("visibilitychange", documentVisibilityHandler);
+  if (typeof IntersectionObserver === "function") {
+    visibilityObserver = new IntersectionObserver(([entry]) => {
+      demoVisible = Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.05);
+      updateLoopPauseState();
+    }, { threshold: [0, 0.05] });
+    visibilityObserver.observe(demo);
+  }
   demo.classList.add("webgl-ready");
   demo.dataset.phase = reduceMotion ? "reduced-motion" : "ready";
   scheduleFrame(animate);
@@ -2218,6 +2451,10 @@ return () => {
   disposed = true;
   cancelAnimationFrame(animationFrame);
   observer?.disconnect();
+  visibilityObserver?.disconnect();
+  if (documentVisibilityHandler) {
+    document.removeEventListener("visibilitychange", documentVisibilityHandler);
+  }
   disposeUi?.();
   renderer?.dispose();
   demo.classList.remove(
