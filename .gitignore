@@ -51,6 +51,11 @@ logs/
 tmp/
 temp/
 
+# Local browser and screenshot QA output
+/.qa-chrome-*/
+/docs/qa-*.png
+/docs/public/qa-*.html
+
 # Operating-system and editor noise
 .DS_Store
 Thumbs.db

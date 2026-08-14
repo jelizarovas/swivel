@@ -54,6 +54,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     likedAnimals: new Set(),
     videoPlaying: true,
     adVariant: 0,
+    swivelOverlay: { visible: false, progress: 0, scale: 1, settingsVisible: false },
     touchPointer: null,
     touchTrail: [],
     touchRipples: [],
@@ -181,6 +182,29 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     return true;
   }
 
+  function setSwivelOverlay(nextOverlay = {}) {
+    const previous = state.swivelOverlay;
+    const next = {
+      visible: Boolean(nextOverlay.visible),
+      progress: clampNumber(nextOverlay.progress, 0, 1),
+      scale: clampNumber(nextOverlay.scale ?? 1, 0.2, 1.2),
+      settingsVisible: Boolean(nextOverlay.settingsVisible)
+    };
+    const changed = previous.visible !== next.visible
+      || previous.settingsVisible !== next.settingsVisible
+      || Math.abs(previous.progress - next.progress) > 0.002
+      || Math.abs(previous.scale - next.scale) > 0.002;
+    if (!changed) return false;
+    const visibilityChanged = previous.visible !== next.visible
+      || previous.settingsVisible !== next.settingsVisible;
+    state.swivelOverlay = next;
+    dirty = true;
+    dirtyInterval = visibilityChanged
+      ? 0
+      : Math.min(dirtyInterval || Number.POSITIVE_INFINITY, cadence.gesture);
+    return true;
+  }
+
   function computeLayout() {
     const width = layoutCanvas.width;
     const height = layoutCanvas.height;
@@ -223,6 +247,7 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     if (state.mode === "video") drawVideo(context, layout, regions, state, state.lastDrawTime);
     drawTaskbar(context, layout, regions, state);
     if (state.startOpen) drawStartMenu(context, layout, regions, state);
+    drawSwivelOverlay(context, layout, state.swivelOverlay);
     drawTouchFeedback(context, layout, state, frameTime);
     drawGlass(context, layout);
     presentFrame();
@@ -463,8 +488,97 @@ export function createInteractiveDesktopTexture({ onRotationRequest, quality = "
     prewarm,
     setOrientation,
     setMode,
+    setSwivelOverlay,
     dispose
   };
+}
+
+function drawSwivelOverlay(context, layout, overlay) {
+  if (!overlay.visible) return;
+  const anchor = 0.85;
+  const centerX = layout.portrait ? layout.width * 0.5 : layout.width * anchor;
+  const centerY = layout.portrait ? layout.height * anchor : layout.height * 0.5;
+  const radius = 55 * layout.unit;
+  const scale = overlay.scale;
+
+  context.save();
+  context.translate(centerX, centerY);
+  context.scale(scale, scale);
+  context.shadowColor = "rgba(8,16,48,.34)";
+  context.shadowBlur = 24 * layout.unit;
+  context.shadowOffsetY = 10 * layout.unit;
+  context.fillStyle = "#657cff";
+  circle(context, 0, 0, radius);
+  context.shadowColor = "transparent";
+
+  context.strokeStyle = "rgba(255,255,255,.3)";
+  context.lineWidth = 2 * layout.unit;
+  context.beginPath();
+  context.arc(0, 0, radius - 2 * layout.unit, 0, Math.PI * 2);
+  context.stroke();
+
+  context.strokeStyle = "#ffffff";
+  context.fillStyle = "#ffffff";
+  context.lineWidth = 5 * layout.unit;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.beginPath();
+  context.arc(0, 0, radius * 0.48, Math.PI * 1.08, Math.PI * 1.82);
+  context.stroke();
+  triangle(
+    context,
+    radius * 0.37, -radius * 0.37,
+    radius * 0.62, -radius * 0.4,
+    radius * 0.48, -radius * 0.16,
+    "#ffffff"
+  );
+  context.beginPath();
+  context.arc(0, 0, radius * 0.48, Math.PI * 0.08, Math.PI * 0.82);
+  context.stroke();
+  triangle(
+    context,
+    -radius * 0.37, radius * 0.37,
+    -radius * 0.62, radius * 0.4,
+    -radius * 0.48, radius * 0.16,
+    "#ffffff"
+  );
+
+  context.strokeStyle = "rgba(19,34,86,.55)";
+  context.lineWidth = 7 * layout.unit;
+  context.beginPath();
+  context.arc(0, 0, radius + 12 * layout.unit, -Math.PI / 2, Math.PI * 1.5);
+  context.stroke();
+  if (overlay.progress > 0) {
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = 6 * layout.unit;
+    context.beginPath();
+    context.arc(
+      0,
+      0,
+      radius + 12 * layout.unit,
+      -Math.PI / 2,
+      -Math.PI / 2 + overlay.progress * Math.PI * 2
+    );
+    context.stroke();
+  }
+  context.restore();
+
+  if (overlay.settingsVisible) {
+    const width = 210 * layout.unit;
+    const height = 54 * layout.unit;
+    const x = clampNumber(centerX - width / 2, 12, layout.width - width - 12);
+    const y = layout.portrait
+      ? centerY - radius - height - 30 * layout.unit
+      : centerY + radius + 25 * layout.unit;
+    panel(context, x, y, width, height, 18 * layout.unit, "rgba(21,28,53,.94)", "rgba(255,255,255,.2)");
+    context.fillStyle = "#ffffff";
+    context.font = `750 ${17 * layout.unit}px Segoe UI, sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("Open settings", x + width / 2, y + height / 2 + layout.unit);
+    context.textAlign = "left";
+    context.textBaseline = "alphabetic";
+  }
 }
 
 function drawTouchFeedback(context, layout, state, time) {

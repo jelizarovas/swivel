@@ -21,17 +21,21 @@ export function Demo({ header }) {
   }, []);
 
   const base = import.meta.env.BASE_URL;
+  const requestedMode = new URLSearchParams(window.location.search).get("mode");
+  const initialMode = ["stand", "wall", "monitor"].includes(requestedMode) ? requestedMode : "stand";
 
   return (
     <figure
       className="demo relative min-w-0 overflow-hidden"
       data-phase="loading"
-      data-mode="stand"
+      data-mode={initialMode}
       aria-label="An interactive 3D Swivel demonstration."
       ref={demoRef}
     >
       {header}
-      <img className="webgl-fallback" src={`${base}assets/animation/frame-landscape.webp`} width="960" height="960" alt="" aria-hidden="true" />
+      {initialMode === "stand" ? (
+        <img className="webgl-fallback" src={`${base}assets/animation/frame-landscape-transparent.png`} width="960" height="960" alt="" aria-hidden="true" />
+      ) : null}
       <canvas id="swivel-scene" aria-hidden="true" />
       <svg className="drag-force-vector" aria-hidden="true">
         <line className="drag-force-line" />

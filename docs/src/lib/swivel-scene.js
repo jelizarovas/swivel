@@ -25,6 +25,8 @@ let loopPaused = false;
 let documentVisible = !document.hidden;
 let demoVisible = true;
 let pausedAt = 0;
+let blockedSweatOverlay = null;
+let blockedSweatDrops = [];
 const scheduleFrame = (callback) => {
   if (!disposed && !loopPaused && animationFrame === 0) {
     animationFrame = requestAnimationFrame(callback);
@@ -290,6 +292,10 @@ try {
   const wallMaterial = material(0x171b25, 0.88, 0.02);
   const studioBlack = material(0x171922, 0.38, 0.18);
   const studioMetal = material(0x343b49, 0.3, 0.42);
+  const deskSurfaceMaterial = material(0x4a3b38, 0.68, 0.04);
+  const deskEdgeMaterial = material(0x20232b, 0.52, 0.16);
+  const keyboardMaterial = material(0x242833, 0.64, 0.08);
+  const keycapMaterial = material(0xcfd4de, 0.58, 0.04);
   const warmShadeInner = new THREE.MeshStandardMaterial({
     color: 0xffd5a1,
     emissive: 0xff9e4d,
@@ -337,6 +343,14 @@ try {
   pendantShade.position.y = 0.25;
   pendantShade.castShadow = true;
   pendantGroup.add(pendantShade);
+  const pendantShadeHit = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.61, 0.68, 20),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+  );
+  pendantShadeHit.position.y = 0.24;
+  pendantShadeHit.userData.action = "pendulum";
+  pendantShadeHit.userData.part = "shade";
+  pendantGroup.add(pendantShadeHit);
   const pendantShadeInner = new THREE.Mesh(
     new THREE.CylinderGeometry(0.145, 0.485, 0.52, 32, 1, true),
     warmShadeInner
@@ -637,8 +651,8 @@ try {
   sceneRig.add(stand);
 
   const wallMount = new THREE.Group();
-  const wallSurface = new THREE.Mesh(roundedSolid(8.8, 7.2, 0.45, 0.12, 0.03), wallMaterial);
-  wallSurface.position.set(0, 0.28, -0.76);
+  const wallSurface = new THREE.Mesh(roundedSolid(9.7, 8.15, 0.48, 0.12, 0.03), wallMaterial);
+  wallSurface.position.set(0, 0.34, -0.76);
   wallSurface.receiveShadow = true;
   wallMount.add(wallSurface);
 
@@ -678,25 +692,117 @@ try {
   sceneRig.add(wallMount);
 
   const monitorStand = new THREE.Group();
-  const monitorStem = cylinderBetween(
-    new THREE.Vector3(0, -2.25, -0.1),
-    new THREE.Vector3(0, 0.52, -0.1),
-    0.16,
-    silver,
-    24);
-  monitorStand.add(monitorStem);
-  const monitorNeck = cylinderBetween(
-    new THREE.Vector3(-1.5, 0.52, -0.1),
-    new THREE.Vector3(1.5, 0.52, -0.1),
-    0.13,
-    darkSilver,
-    24);
-  monitorStand.add(monitorNeck);
-  const monitorBase = new THREE.Mesh(roundedSolid(3.25, 0.82, 0.3, 0.2, 0.04), darkSilver);
+  const deskTop = new THREE.Mesh(roundedSolid(7.55, 3.3, 0.34, 0.22, 0.035), deskSurfaceMaterial);
+  deskTop.rotation.x = -Math.PI / 2;
+  deskTop.position.set(0, -1.28, 0.16);
+  deskTop.castShadow = true;
+  deskTop.receiveShadow = true;
+  monitorStand.add(deskTop);
+
+  const deskEdge = new THREE.Mesh(roundedSolid(7.62, 3.37, 0.36, 0.08, 0.025), deskEdgeMaterial);
+  deskEdge.rotation.x = -Math.PI / 2;
+  deskEdge.position.set(0, -1.39, 0.16);
+  deskEdge.castShadow = true;
+  monitorStand.add(deskEdge);
+
+  for (const x of [-2.8, 2.8]) {
+    const deskLeg = new THREE.Mesh(roundedSolid(0.26, 1.32, 0.09, 0.24, 0.025), studioMetal);
+    deskLeg.position.set(x, -1.96, -0.58);
+    deskLeg.castShadow = true;
+    monitorStand.add(deskLeg);
+    monitorStand.add(cylinderBetween(
+      new THREE.Vector3(x, -2.57, -1.18),
+      new THREE.Vector3(x, -2.57, 0.22),
+      0.075,
+      studioMetal,
+      16));
+  }
+  monitorStand.add(cylinderBetween(
+    new THREE.Vector3(-2.72, -2.02, -0.69),
+    new THREE.Vector3(2.72, -2.02, -0.69),
+    0.065,
+    studioMetal,
+    18));
+
+  const monitorBase = new THREE.Mesh(roundedSolid(2.85, 0.78, 0.28, 0.17, 0.035), darkSilver);
   monitorBase.rotation.x = -Math.PI / 2;
-  monitorBase.position.set(0, -2.42, 0.12);
+  monitorBase.position.set(0, -1.08, -0.28);
   monitorBase.castShadow = true;
   monitorStand.add(monitorBase);
+
+  const monitorStem = new THREE.Mesh(roundedSolid(0.38, 2.06, 0.15, 0.22, 0.035), silver);
+  monitorStem.position.set(0, -0.04, -0.28);
+  monitorStem.castShadow = true;
+  monitorStand.add(monitorStem);
+  monitorStand.add(cylinderBetween(
+    new THREE.Vector3(0, 0.96, -0.28),
+    new THREE.Vector3(0, 1.58, 0.04),
+    0.115,
+    silver,
+    22));
+  monitorStand.add(cylinderBetween(
+    new THREE.Vector3(0, 1.58, 0.04),
+    new THREE.Vector3(0, 2.18, 0.25),
+    0.1,
+    darkSilver,
+    22));
+  const monitorPivot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 32), darkSilver);
+  monitorPivot.rotation.x = Math.PI / 2;
+  monitorPivot.position.set(0, 2.18, 0.25);
+  monitorPivot.castShadow = true;
+  monitorStand.add(monitorPivot);
+
+  const keyboard = new THREE.Group();
+  keyboard.position.set(-0.28, -1.1, 0.93);
+  keyboard.rotation.y = -0.055;
+  const keyboardBase = new THREE.Mesh(roundedSolid(2.72, 1.02, 0.18, 0.11, 0.025), keyboardMaterial);
+  keyboardBase.rotation.x = -Math.PI / 2;
+  keyboardBase.castShadow = true;
+  keyboard.add(keyboardBase);
+  const keyPositions = [];
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = 0; column < 12; column += 1) {
+      keyPositions.push([-1.075 + column * 0.195, -0.3 + row * 0.18]);
+    }
+  }
+  for (const x of [-1.075, -0.88, -0.685, 0.685, 0.88, 1.075]) {
+    keyPositions.push([x, 0.41]);
+  }
+  const keycaps = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.15, 0.045, 0.105),
+    keycapMaterial,
+    keyPositions.length
+  );
+  const keyMatrix = new THREE.Matrix4();
+  keyPositions.forEach(([x, z], index) => {
+    keycaps.setMatrixAt(index, keyMatrix.makeTranslation(x, 0.085, z));
+  });
+  keycaps.instanceMatrix.needsUpdate = true;
+  keycaps.castShadow = renderQualityName !== "low";
+  keyboard.add(keycaps);
+  const spacebar = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.05, 0.11), keycapMaterial);
+  spacebar.position.set(0, 0.088, 0.41);
+  spacebar.castShadow = renderQualityName !== "low";
+  keyboard.add(spacebar);
+  monitorStand.add(keyboard);
+
+  const mousePad = new THREE.Mesh(roundedSolid(1.18, 1.34, 0.22, 0.025, 0.012), keyboardMaterial);
+  mousePad.rotation.x = -Math.PI / 2;
+  mousePad.position.set(2.05, -1.145, 1.02);
+  mousePad.receiveShadow = true;
+  monitorStand.add(mousePad);
+  const mouse = new THREE.Group();
+  mouse.position.set(2.05, -1.06, 1.02);
+  mouse.rotation.y = -0.12;
+  const mouseBody = new THREE.Mesh(roundedSolid(0.48, 0.72, 0.2, 0.14, 0.028), whitePlastic);
+  mouseBody.rotation.x = -Math.PI / 2;
+  mouseBody.castShadow = true;
+  mouse.add(mouseBody);
+  const mouseWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.09, 16), studioBlack);
+  mouseWheel.rotation.z = Math.PI / 2;
+  mouseWheel.position.set(0, 0.085, -0.08);
+  mouse.add(mouseWheel);
+  monitorStand.add(mouse);
   monitorStand.visible = false;
   sceneRig.add(monitorStand);
 
@@ -913,18 +1019,17 @@ try {
     map: buttonTexture,
     transparent: true,
     opacity: 0,
-    depthTest: true,
+    colorWrite: false,
+    depthTest: false,
     depthWrite: false,
     toneMapped: false
   });
   const bubbleGroup = new THREE.Group();
-  bubbleGroup.position.set(2.6, 0, 0.252);
-  bubbleGroup.renderOrder = 10;
+  bubbleGroup.position.set(2.35, 0, 0.252);
   display.add(bubbleGroup);
 
   const bubble = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.72), bubbleMaterial);
   bubble.userData.action = "bubble";
-  bubble.renderOrder = 10;
   bubbleGroup.add(bubble);
 
   const ringPoints = [];
@@ -935,28 +1040,49 @@ try {
   const ringGeometry = new THREE.BufferGeometry().setFromPoints(ringPoints);
   const ringBackground = new THREE.Line(
     ringGeometry.clone(),
-    new THREE.LineBasicMaterial({ color: 0x26345f, transparent: true, opacity: 0.35, depthTest: true, depthWrite: false }));
-  ringBackground.renderOrder = 11;
+    new THREE.LineBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false }));
   bubbleGroup.add(ringBackground);
   const ringProgress = new THREE.Line(
     ringGeometry,
-    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: true, depthWrite: false }));
+    new THREE.LineBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false }));
   ringProgress.geometry.setDrawRange(0, 1);
-  ringProgress.renderOrder = 12;
   bubbleGroup.add(ringProgress);
 
   const settingsMaterial = new THREE.MeshBasicMaterial({
     map: createLabelTexture("Open settings"),
     transparent: true,
     opacity: 0,
-    depthTest: true,
+    colorWrite: false,
+    depthTest: false,
     depthWrite: false,
     toneMapped: false
   });
   const settingsBubble = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 0.51), settingsMaterial);
   settingsBubble.position.set(0, -0.47, 0.014);
-  settingsBubble.renderOrder = 13;
   bubbleGroup.add(settingsBubble);
+
+  blockedSweatOverlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  blockedSweatOverlay.setAttribute("aria-hidden", "true");
+  Object.assign(blockedSweatOverlay.style, {
+    position: "absolute",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    overflow: "visible",
+    pointerEvents: "none",
+    display: "none",
+    zIndex: "13"
+  });
+  blockedSweatDrops = Array.from({ length: 3 }, (_, index) => {
+    const drop = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    drop.setAttribute("d", "M 0 -12 C 7 -4 9 3 0 8 C -9 3 -7 -4 0 -12 Z");
+    drop.setAttribute("fill", index === 1 ? "#d9f5ff" : "#9de5ff");
+    drop.setAttribute("stroke", "rgba(255,255,255,.95)");
+    drop.setAttribute("stroke-width", "2");
+    blockedSweatOverlay.append(drop);
+    return drop;
+  });
+  demo.append(blockedSweatOverlay);
 
   // A single continuous bezel target prevents overlapping edge volumes from
   // choosing a different hidden edge at oblique podium angles.
@@ -1047,6 +1173,11 @@ try {
   const cameraLook = new THREE.Vector3(0, 0.25, 0);
   let stageOffsetX = 0;
   let currentMode = "stand";
+  const modeFraming = {
+    stand: { minimumVerticalHalf: 6.35, narrowHalfWidth: 4.15 },
+    wall: { minimumVerticalHalf: 6.35, narrowHalfWidth: 4.28 },
+    monitor: { minimumVerticalHalf: 6.35, narrowHalfWidth: 4.65 }
+  };
   let guided = !reduceMotion;
   let guidedElapsedSeconds = 0;
   let lastActivityAt = performance.now();
@@ -1087,13 +1218,13 @@ try {
     displayMount.rotation.y = 0;
     if (mode === "wall") {
       sceneRig.rotation.y = 0;
-      displayMount.position.set(0, 0.3, -0.12);
+      displayMount.position.set(0, 0.4, -0.08);
       displayMount.rotation.x = 0;
-      display.scale.setScalar(0.88);
-      cameraGoal.set(0, 0.6, 13);
-      cameraLook.set(0, 0.28, 0);
+      display.scale.setScalar(1.04);
+      cameraGoal.set(0, 0.72, 13);
+      cameraLook.set(0, 0.34, 0);
     } else if (mode === "monitor") {
-      displayMount.position.set(0, 1.48, 0.62);
+      displayMount.position.set(0, 2.18, 0.62);
       displayMount.rotation.x = -0.1;
       display.scale.setScalar(0.84);
       cameraGoal.set(6.8, 4.8, 11.8);
@@ -1111,6 +1242,7 @@ try {
     for (const button of modeButtons) {
       button.setAttribute("aria-selected", String(button.dataset.demoMode === mode));
     }
+    resize();
     renderDirty = true;
     shadowDirty = true;
   }
@@ -1153,6 +1285,8 @@ try {
     pendantDirection.copy(pendantRestDirection);
     orbitState = null;
     sceneRig.rotation.y = 0;
+    setPendantHandsHidden(false);
+    clearBlockedGripFeedback();
     renderDirty = true;
     shadowDirty = true;
     demo.classList.remove(
@@ -1227,7 +1361,7 @@ try {
   }
 
   function getPendulumPickFromRay() {
-    const hit = raycaster.intersectObjects([pendantBulbHit, pendantCordHit], false)[0];
+    const hit = raycaster.intersectObjects([pendantBulbHit, pendantShadeHit, pendantCordHit], false)[0];
     if (!hit) return null;
     const occluder = raycaster.intersectObjects(
       [screenInteriorHit, chassis, rearShell, frame, stage],
@@ -1235,9 +1369,12 @@ try {
     )[0];
     if (occluder && occluder.distance + 0.02 < hit.distance) return null;
     const part = hit.object.userData.part;
+    const projectedRadius = hit.point.clone().sub(pendantAnchor).dot(pendantDirection);
     const grabRadius = part === "cord"
-      ? clamp(hit.point.clone().sub(pendantAnchor).dot(pendantDirection), pendantLength * 0.18, pendantLength)
-      : pendantLength + 0.34;
+      ? clamp(projectedRadius, pendantLength * 0.18, pendantLength)
+      : part === "shade"
+        ? clamp(projectedRadius, pendantLength - 0.68, pendantLength + 0.08)
+        : pendantLength + 0.34;
     return { hit, part, grabRadius };
   }
 
@@ -1249,10 +1386,20 @@ try {
   function getFloorLightPickFromRay() {
     const hit = raycaster.intersectObject(floorBulbHit, false)[0];
     if (!hit) return null;
-    const occluder = raycaster.intersectObjects(
+    const fixedOccluder = raycaster.intersectObjects(
       [screenInteriorHit, chassis, rearShell, frame, stage],
       false
     )[0];
+    const monitorOccluder = currentMode === "monitor"
+      ? raycaster.intersectObject(monitorStand, true)[0]
+      : null;
+    const occluder = !fixedOccluder
+      ? monitorOccluder
+      : !monitorOccluder
+        ? fixedOccluder
+        : fixedOccluder.distance <= monitorOccluder.distance
+          ? fixedOccluder
+          : monitorOccluder;
     return occluder && occluder.distance + 0.02 < hit.distance ? null : hit;
   }
 
@@ -1593,7 +1740,53 @@ try {
     const velocity = clamp(effectiveForce / dragDistance * 9.5, -2.75, 2.75);
     physicalProgress = clamp(physicalProgress + velocity * deltaSeconds);
     physicalTarget = physicalProgress;
+    if (dragState.blocked) {
+      const effort = clamp((Math.abs(tangentialForce) - 6) / 150);
+      dragState.blockedEffort = clamp(
+        dragState.blockedEffort + deltaSeconds * (0.2 + effort * 1.8)
+      );
+    } else {
+      dragState.blockedEffort = 0;
+    }
     dragState.velocity = velocity;
+  }
+
+  function clearBlockedGripFeedback() {
+    if (blockedSweatOverlay) blockedSweatOverlay.style.display = "none";
+    for (const drop of blockedSweatDrops) drop.style.opacity = "0";
+  }
+
+  function updateBlockedGripFeedback(gripPoint) {
+    const strain = clamp(dragState?.blockedEffort ?? 0);
+    if (!blockedSweatOverlay || strain < 0.18) {
+      clearBlockedGripFeedback();
+      return { x: 0, y: 0 };
+    }
+
+    const time = performance.now();
+    const shakeAmplitude = Math.pow(strain, 1.35) * 7;
+    const shake = {
+      x: Math.sin(time * 0.082) * shakeAmplitude,
+      y: Math.sin(time * 0.113 + 0.8) * shakeAmplitude * 0.48
+    };
+    blockedSweatOverlay.style.display = "block";
+    const offsets = [
+      [46, -70, -24],
+      [70, -44, 16],
+      [31, -94, -42]
+    ];
+    blockedSweatDrops.forEach((drop, index) => {
+      const [offsetX, offsetY, rotation] = offsets[index];
+      const stagger = clamp((strain - 0.18 - index * 0.14) / 0.35);
+      const flutter = Math.sin(time * 0.006 + index * 2.1) * 5;
+      const scale = 0.58 + stagger * 0.62;
+      drop.style.opacity = String(stagger);
+      drop.setAttribute(
+        "transform",
+        `translate(${gripPoint.x + offsetX + flutter} ${gripPoint.y + offsetY - stagger * 12}) rotate(${rotation}) scale(${scale})`
+      );
+    });
+    return shake;
   }
 
   function updateDragVisual() {
@@ -1601,9 +1794,10 @@ try {
     if (!geometry) return;
     const { rawPointerX, rawPointerY, gripPoint } = geometry;
     forceVector?.classList.toggle("is-blocked", Boolean(dragState.blocked));
+    const shake = updateBlockedGripFeedback(gripPoint);
     if (gripElement) {
-      gripElement.style.left = `${gripPoint.x}px`;
-      gripElement.style.top = `${gripPoint.y}px`;
+      gripElement.style.left = `${gripPoint.x + shake.x}px`;
+      gripElement.style.top = `${gripPoint.y + shake.y}px`;
     }
     if (forceLine) {
       forceLine.setAttribute("x1", String(gripPoint.x));
@@ -1633,10 +1827,6 @@ try {
       x: pendulumDragState.pointerX - pendulumDragState.pointerOffsetX - demoRect.left,
       y: pendulumDragState.pointerY - pendulumDragState.pointerOffsetY - demoRect.top
     };
-    if (gripElement) {
-      gripElement.style.left = `${gripPoint.x}px`;
-      gripElement.style.top = `${gripPoint.y}px`;
-    }
     if (forceLine) {
       forceLine.setAttribute("x1", String(gripPoint.x));
       forceLine.setAttribute("y1", String(gripPoint.y));
@@ -1695,6 +1885,21 @@ try {
     cursorElement.classList.toggle("is-grip", gripping);
   }
 
+  function setPendantHandsHidden(hidden) {
+    if (cursorElement) {
+      if (hidden) cursorElement.style.display = "none";
+      else cursorElement.style.removeProperty("display");
+    }
+    if (gripElement) {
+      if (hidden) gripElement.style.display = "none";
+      else gripElement.style.removeProperty("display");
+    }
+    if (hidden) {
+      pointer.visible = false;
+      grip.visible = false;
+    }
+  }
+
   function pointerIsInsideCanvas(event) {
     const rect = canvas.getBoundingClientRect();
     return event.clientX >= rect.left && event.clientX <= rect.right
@@ -1716,6 +1921,8 @@ try {
     desktopPointerState = null;
     pendantOmega.set(0, 0, 0);
     orbitState = null;
+    setPendantHandsHidden(false);
+    clearBlockedGripFeedback();
     pressedAction = null;
     pressedPointerId = null;
     demo.classList.remove("is-dragging", "is-orbiting", "is-light-dragging");
@@ -1829,8 +2036,10 @@ try {
         pointerOffsetX: event.clientX - demoRect.left - initialGripPoint.x,
         pointerOffsetY: event.clientY - demoRect.top - initialGripPoint.y,
         velocity: 0,
+        blockedEffort: 0,
         gripLocal: edgePick.localPoint
       };
+      clearBlockedGripFeedback();
       forceVector?.classList.remove("is-blocked");
       updateDragVisual();
       demo.classList.add("is-dragging");
@@ -1854,6 +2063,7 @@ try {
         rootBranch: null
       };
       pendantOmega.set(0, 0, 0);
+      setPendantHandsHidden(true);
       updatePendulumDragVisual();
       setCursorAction("pendulum");
       forceVector?.classList.remove("is-blocked");
@@ -1898,12 +2108,14 @@ try {
         ? (releaseProgress <= 0.15 ? 0 : 1)
         : (releaseProgress >= 0.85 ? 1 : 0);
       dragState = null;
+      clearBlockedGripFeedback();
       demo.classList.remove("is-dragging");
       forceVector?.classList.remove("is-blocked");
       releaseDragCursor(event);
       updateInteractiveCaption();
     } else if (pendulumDragState) {
       pendulumDragState = null;
+      setPendantHandsHidden(false);
       demo.classList.remove("is-light-dragging");
       forceVector?.classList.remove("is-blocked");
       releaseDragCursor(event);
@@ -2072,6 +2284,12 @@ try {
       if (dragState) updateDragVisual();
       if (pendulumDragState) updatePendulumDragVisual();
       updateDesktopOrientation(contentProgress);
+      ui.setSwivelOverlay({
+        visible: bubbleVisible,
+        progress: bubbleProgress,
+        scale: 1,
+        settingsVisible: settingsOpacity > 0
+      });
       const uiPresented = ui.draw(time);
       bubbleGroup.rotation.z = -display.rotation.z;
       bubbleMaterial.opacity = bubbleVisible ? 1 : 0;
@@ -2245,6 +2463,12 @@ try {
     guidedContentProgress = clamp(contentAngle / (Math.PI / 2));
     display.rotation.z = panelAngle;
     updateDesktopOrientation(contentAngle / (Math.PI / 2));
+    ui.setSwivelOverlay({
+      visible: bubbleOpacity > 0.002,
+      progress: bubbleProgress,
+      scale: bubbleScale,
+      settingsVisible: false
+    });
     ui.draw(time);
     bubbleGroup.rotation.z = -panelAngle;
     bubbleMaterial.opacity = bubbleOpacity;
@@ -2256,7 +2480,7 @@ try {
 
     if (pointerOpacity > 0.002) {
       const sensorTarget = getWorldPosition(new THREE.Vector3(3.68, 0, 0.32));
-      const bubbleTarget = getWorldPosition(new THREE.Vector3(2.6, 0, 0.34));
+      const bubbleTarget = getWorldPosition(new THREE.Vector3(2.35, 0, 0.34));
       const trayLandscapeLocal = new THREE.Vector3(2.5, -1.77, 0.3);
       const trayPortraitLocal = new THREE.Vector3(3.11, 1.19, 0.3);
       const trayTarget = getWorldPosition(trayLandscapeLocal.lerp(trayPortraitLocal, pointerPortraitAmount));
@@ -2292,7 +2516,11 @@ try {
     const height = Math.max(1, Math.floor(rect.height));
     const aspect = width / height;
     renderer.setPixelRatio(getEffectivePixelRatio(width, height));
-    const verticalHalf = 6.35;
+    const framing = modeFraming[currentMode] ?? modeFraming.stand;
+    const verticalHalf = Math.max(
+      framing.minimumVerticalHalf,
+      framing.narrowHalfWidth / Math.max(aspect, 0.35)
+    );
     camera.left = -verticalHalf * aspect;
     camera.right = verticalHalf * aspect;
     camera.top = verticalHalf;
@@ -2325,6 +2553,8 @@ try {
     pressedAction = null;
     pressedPointerId = null;
     bubbleHoldTriggered = false;
+    setPendantHandsHidden(false);
+    clearBlockedGripFeedback();
     demo.classList.remove(
       "is-dragging",
       "is-orbiting",
@@ -2440,6 +2670,9 @@ return () => {
   }
   disposeUi?.();
   renderer?.dispose();
+  blockedSweatOverlay?.remove();
+  cursorElement?.style.removeProperty("display");
+  gripElement?.style.removeProperty("display");
   demo.classList.remove(
     "webgl-ready",
     "is-interactive",
